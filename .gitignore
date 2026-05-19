@@ -1,0 +1,6 @@
+/tmp/
+/*.key
+*.pem
+*.crt
+*.log
+.vault-token
