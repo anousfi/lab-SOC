@@ -1,0 +1,48 @@
+# 1. Activer le moteur de secrets PKI
+- name: Activer PKI backend
+  community.hashi_vault.vault_pki_secret_backend:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    path: "{{ pki_path }}"
+    description: "PKI du lab"
+    max_lease_ttl: "{{ pki_ttl }}"
+
+# 2. Générer la CA racine
+- name: Générer CA racine
+  community.hashi_vault.vault_pki_root_generate:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    path: "{{ pki_path }}"
+    common_name: "{{ pki_common_name }}"
+    ttl: "{{ pki_ttl }}"
+  register: root_ca
+  when: root_ca.data is not defined
+
+- name: Store CA in Vault
+  community.hashi_vault.vault_kv2_write:
+    path: secret/pki/ca
+    data:
+      certificate: "{{ root_ca.data.certificate }}"
+
+# 3. Configurer les URLs
+- name: Configurer URLs
+  community.hashi_vault.vault_pki_config_urls:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    path: "{{ pki_path }}"
+    issuing_certificates: "{{ vault_url }}/v1/{{ pki_path }}/ca"
+    crl_distribution_points: "{{ vault_url }}/v1/{{ pki_path }}/crl"
+    create: false
+
+# 4. Créer un rôle PKI
+- name: Créer le rôle PKI
+  community.hashi_vault.vault_pki_role:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    path: "{{ pki_path }}"
+    name: "{{ pki_role_name }}"
+    ttl: "720h"
+    allowed_domains:
+      - lab.local
+    allow_subdomains: true
+    allow_ip_sans: true

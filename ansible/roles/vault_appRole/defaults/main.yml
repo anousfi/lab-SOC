@@ -1,0 +1,8 @@
+vault_url: "https://127.0.0.1:8200"
+
+vault_approle_name: "ansible"
+
+vault_policy_name: "elk-policy"
+
+vault_token_ttl: "1h"
+vault_token_max_ttl: "4h"

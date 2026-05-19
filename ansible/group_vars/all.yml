@@ -1,0 +1,3 @@
+elasticsearch_host: 10.0.x.x
+elasticsearch_port: 9200
+kibana_port: 5601

@@ -1,0 +1,54 @@
+- name: Get Filebeat API key from Vault
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    path: "secret/filebeat_api_key"
+  register: filebeat_secret
+  failed_when: false
+  no_log: true
+
+- name: Create Filebeat API key
+  ansible.builtin.uri:
+    url: "https://{{ elasticsearch_host }}:9200/_security/api_key"
+    method: POST
+    user: elastic
+    password: "{{ elastic_secret.data.data.elastic_password }}"
+    body_format: json
+    body:
+      name: filebeat-key
+      role_descriptors:
+        filebeat_role:
+          cluster:
+            - monitor
+            - manage_ilm
+          index:
+            - names: ["filebeat-*"]
+              privileges:
+                - write
+                - create_doc
+    validate_certs: true
+    ca_path: /etc/elasticsearch/certs/ca.crt
+  register: filebeat_api_key
+  when: filebeat_secret.data is not defined
+  no_log: true
+
+- name: Store Filebeat API key in Vault
+  community.hashi_vault.vault_kv2_write:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    path: "secret/filebeat_api_key"
+    data:
+      api_key: "{{ filebeat_api_key.json.id }}:{{ filebeat_api_key.json.api_key }}"
+  when: filebeat_secret.data is not defined
+  no_log: true
+
+- name: Set Filebeat API key fact
+  ansible.builtin.set_fact:
+    filebeat_api_key: >-
+      {{
+        filebeat_secret.data.data.api_key
+        if filebeat_secret.data is defined
+        else filebeat_api_key.json.id ~ ':' ~ filebeat_api_key.json.api_key
+      }}
+  changed_when: false
+  no_log: true

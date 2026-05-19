@@ -1,0 +1,18 @@
+filebeat.inputs:
+  - type: container
+    paths:
+      - /var/lib/docker/containers/*/*.log
+
+output.elasticsearch:
+  hosts: ["https://{{ elasticsearch_host }}:{{ elasticsearch_port }}"]
+  api_key: "{{ filebeat_api_key }}"
+  ssl.certificate_authorities: "/etc/filebeat/certs/ca.crt"
+
+setup.dashboards.enabled: true
+
+setup.kibana:
+  host: "https://{{ kibana_host }}:5601"
+  ssl.certificate_authorities: ["/etc/filebeat/certs/ca.crt"]
+  username: "kibana_system"
+  password: "${KIBANA_PASSWORD}"
+

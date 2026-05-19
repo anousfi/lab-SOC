@@ -1,0 +1,10 @@
+- name: Installer firewalld
+  apt:
+    name: firewalld
+    state: present
+
+- name: Démarrer firewalld
+  systemd:
+    name: firewalld
+    state: started
+    enabled: true

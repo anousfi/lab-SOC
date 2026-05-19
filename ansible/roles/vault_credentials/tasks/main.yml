@@ -1,0 +1,29 @@
+- name: Generate elastic password
+  ansible.builtin.set_fact:
+    elastic_password: "{{ lookup('ansible.builtin.password', '/dev/null length=24 chars=ascii_letters,digits') }}"
+  when: elastic_secret.data is not defined
+  no_log: true
+
+- name: Store elastic password
+  community.hashi_vault.vault_kv2_write:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    path: "secret/elastic"
+    data:
+      elastic_password: "{{ elastic_password }}"
+  when: elastic_secret.data is not defined
+  no_log: true
+
+- name: Generate kibana password
+  ansible.builtin.set_fact:
+    kibana_password: "{{ lookup('ansible.builtin.password', '/dev/null length=24 chars=ascii_letters,digits') }}"
+  no_log: true
+
+- name: Store kibana password
+  community.hashi_vault.vault_kv2_write:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    path: "secret/kibana"
+    data:
+      kibana_password: "{{ kibana_password }}"
+  no_log: true

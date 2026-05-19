@@ -1,0 +1,16 @@
+- name: Install JDK
+  ansible.builtin.apt:
+    name: openjdk-17-jdk
+    state: present
+
+- name: Install Elasticsearch
+  ansible.builtin.apt:
+    name: elasticsearch
+    state: present
+
+- name: Open port 9200
+  ansible.posix.firewalld:
+    port: "{{ elasticsearch_port }}/tcp"
+    permanent: true
+    immediate: true
+    state: enabled

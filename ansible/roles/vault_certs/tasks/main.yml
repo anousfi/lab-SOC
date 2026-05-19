@@ -1,0 +1,58 @@
+- name: Create cert directories
+  ansible.builtin.file:
+    path: "/tmp/certs/{{ item.name }}"
+    state: directory
+    mode: "0700"
+  loop: "{{ services }}"
+
+- name: Get CA from Vault
+  community.hashi_vault.vault_kv2_get:
+    path: secret/pki/ca
+  register: ca_data
+
+- name: Generate certificates for services
+  community.hashi_vault.vault_pki_generate_certificate:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: "{{ pki_path }}"
+    role_name: "{{ pki_role_name }}"
+    common_name: "{{ item.cn }}"
+    alt_names: "{{ item.dns | default([item.cn]) }}"
+    ip_sans: >-
+      {{
+        (['127.0.0.1'] +
+        ([hostvars[groups[item.host][0]].ansible_host]
+          if (groups[item.host] is defined and groups[item.host] | length > 0)
+          else [])
+        )
+      }}
+    ttl: "720h"
+  loop: "{{ services }}"
+  register: cert_results
+  no_log: true
+
+- name: Save certificates
+  ansible.builtin.copy:
+    dest: "/tmp/certs/{{ item.item.name }}/{{ item.item.name }}.crt"
+    content: "{{ item.data.certificate }}"
+    owner: root
+    group: root
+    mode: "0600"
+  loop: "{{ cert_results.results }}"
+  no_log: true
+
+- name: Save private keys
+  ansible.builtin.copy:
+    dest: "/tmp/certs/{{ item.item.name }}/{{ item.item.name }}.key"
+    content: "{{ item.data.private_key }}"
+    owner: root
+    group: root
+    mode: "0600"
+  loop: "{{ cert_results.results }}"
+  no_log: true
+
+- name: Save CA
+  ansible.builtin.copy:
+    dest: /tmp/pki/ca.crt
+    content: "{{ ca_data.data.data.certificate }}"
+    mode: "0644"

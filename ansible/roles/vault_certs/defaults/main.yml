@@ -1,0 +1,23 @@
+services:
+  - name: elasticsearch
+    cn: elasticsearch.lab.local
+    dns:
+      - elasticsearch.lab.local
+      - elasticsearch
+      - localhost
+    ips:
+      - 127.0.0.1
+    host: role_elasticsearch
+
+  - name: kibana
+    cn: kibana.lab.local
+    dns:
+      - kibana.lab.local
+      - kibana
+    host: role_kibana
+
+  - name: filebeat
+    cn: filebeat.lab.local
+    dns:
+      - filebeat.lab.local
+    host: role_filebeat

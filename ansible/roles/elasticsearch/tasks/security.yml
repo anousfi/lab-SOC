@@ -1,0 +1,25 @@
+- name: Get secrets from Vault
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    path: "secret/elastic"
+  register: elastic_secret
+  failed_when: false
+  no_log: true
+
+- name: Fail if secret missing
+  ansible.builtin.fail:
+    msg: "Elastic password missing in Vault"
+  when: elastic_secret.data is not defined
+
+- name: Ensure elastic password is correct
+  ansible.builtin.uri:
+    url: "https://{{ elasticsearch_host }}:9200/_security/user/elastic/_password"
+    method: POST
+    user: elastic
+    password: "{{ elastic_secret.data.data.elastic_password }}"
+    body_format: json
+    body:
+      password: "{{ elastic_secret.data.data.elastic_password }}"
+    validate_certs: true
+    ca_path: /etc/elasticsearch/certs/ca.crt

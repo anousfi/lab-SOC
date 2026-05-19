@@ -1,0 +1,33 @@
+- hosts: all
+  become: true
+  roles:
+    - common
+
+- hosts: localhost
+  become: true
+  roles:
+    - vault_pki
+    - vault_auth
+    - vault_certs
+    - vault_credentials
+
+- hosts: role_elasticsearch
+  become: true
+  roles:
+    - elasticsearch
+
+- hosts: role_kibana
+  become: true
+  roles:
+    - kibana
+
+- hosts: role_webserver
+  become: true
+  roles: 
+    - docker
+    - filebeat
+
+
+
+
+

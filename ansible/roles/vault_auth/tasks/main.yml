@@ -1,0 +1,7 @@
+- name: Login AppRole
+  community.hashi_vault.vault_login:
+    url: "{{ vault_url }}"
+    auth_method: approle
+    role_id: "{{ vault_role_id }}"
+    secret_id: "{{ vault_secret_id }}"
+  register: vault_login

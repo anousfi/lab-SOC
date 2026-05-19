@@ -1,0 +1,79 @@
+- name: Installer filebeat
+  ansible.builtin.apt:
+    name: filebeat
+    state: present
+
+- name: Activer module Docker Filebeat si pas déjà fait
+  ansible.builtin.command: filebeat modules enable docker
+  become: yes
+  changed_when: false
+
+- name: Create cert dir
+  ansible.builtin.file:
+    path: /etc/filebeat/certs
+    state: directory
+    mode: "0700"
+
+- name: Copy filebeat cert
+  ansible.builtin.copy:
+    src: "/tmp/certs/filebeat/filebeat.crt"
+    dest: /etc/filebeat/certs/filebeat.crt
+    mode: "0644"
+
+- name: Copy filebeat key
+  ansible.builtin.copy:
+    src: "/tmp/certs/filebeat/filebeat.key"
+    dest: /etc/filebeat/certs/filebeat.key
+    mode: "0600" 
+
+- name: Copy CA
+  ansible.builtin.copy:
+    src: "/tmp/pki/ca.crt"
+    dest: /etc/filebeat/certs/ca.crt
+
+- name: Wait for Elasticsearch
+  ansible.builtin.uri:
+    url: "https://{{ elasticsearch_host }}:9200"
+    method: GET
+    validate_certs: true
+    ca_path: /etc/filebeat/certs/ca.crt
+  register: elastic_status
+  until: elastic_status.status == 200
+  retries: 30
+  delay: 5
+
+- name: Create Filebeat keystore
+  ansible.builtin.command:
+    cmd: /usr/share/filebeat/bin/filebeat keystore create
+    creates: /etc/filebeat/filebeat.keystore
+
+- name: Get kibana password from Vault
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    path: "secret/kibana"
+  register: kibana_secret
+  no_log: true
+
+- name: Add Kibana password to Filebeat keystore
+  ansible.builtin.command:
+    cmd: >
+      /usr/share/filebeat/bin/filebeat keystore add
+      KIBANA_PASSWORD --stdin --force
+  stdin: "{{ kibana_secret.data.data.kibana_password }}"
+  no_log: true
+  notify: restart filebeat
+   
+- name: Activer parsing logs 
+  ansible.builtin.template:
+    src: filebeat.yml.j2
+    dest: /etc/filebeat/filebeat.yml
+    validate: '/usr/sbin/filebeat -t -c %s'
+  notify: restart filebeat
+
+- name: Start Filebeat
+  systemd:
+    name: filebeat
+    state: started
+    enabled: true
+

@@ -1,0 +1,34 @@
+- name: Create cert dir
+  ansible.builtin.file:
+    path: /etc/elasticsearch/certs
+    state: directory
+    mode: "0700"
+
+- name: Copy cert
+  ansible.builtin.copy:
+    src: "/tmp/certs/elasticsearch/elasticsearch.crt"
+    dest: /etc/elasticsearch/certs/elasticsearch.crt
+    mode: "0644"
+
+- name: Copy key
+  ansible.builtin.copy:
+    src: "/tmp/certs/elasticsearch/elasticsearch.key"
+    dest: /etc/elasticsearch/certs/elasticsearch.key
+    mode: "0600"
+
+- name: Copy CA
+  ansible.builtin.copy:
+    src: "/tmp/pki/ca.crt"
+    dest: /etc/elasticsearch/certs/ca.crt
+
+- name: Configure Elasticsearch
+  ansible.builtin.template:
+    src: elasticsearch.yml.j2
+    dest: /etc/elasticsearch/elasticsearch.yml
+  notify: restart elasticsearch
+
+- name: Start Elasticsearch
+  ansible.builtin.systemd:
+    name: elasticsearch
+    state: started
+    enabled: true

@@ -1,0 +1,9 @@
+*.pem
+*.pub
+id_rsa
+id_rsa.pub
+.aws/
+terraform.tfstate
+terraform.tfstate.backup
+.terraform/
+*.tfvars
