@@ -62,7 +62,7 @@ resource "aws_instance" "elasticsearch" {
   associate_public_ip_address = false
   key_name = aws_key_pair.deployer.key_name
 
-  vpc_security_group_ids = [aws_security_group.elk-sg.id]
+  vpc_security_group_ids = [aws_security_group.elastic-sg.id]
 
   user_data = <<-EOF
               #!/bin/bash
@@ -87,7 +87,7 @@ resource "aws_instance" "kibana" {
   associate_public_ip_address = false
   key_name = aws_key_pair.deployer.key_name
 
-  vpc_security_group_ids = [aws_security_group.elk-sg.id]
+  vpc_security_group_ids = [aws_security_group.kibana-sg.id]
 
   user_data = <<-EOF
               #!/bin/bash
@@ -121,7 +121,7 @@ resource "aws_subnet" "public" {
 }
 
 #----------------------Security Group ELK ----------------------------------
-resource "aws_security_group" "elk-sg" {
+resource "aws_security_group" "elastic-sg" {
   vpc_id = aws_vpc.main.id
 
   ingress {
@@ -134,6 +134,46 @@ resource "aws_security_group" "elk-sg" {
   ingress {
     from_port   = 80
     to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
+  }
+
+  ingress {
+    from_port   = 9200
+    to_port     = 9200
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
+  }
+
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_security_group" "kibana-sg" {
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
+  }
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
+  }
+
+  ingress {
+    from_port   = 5601
+    to_port     = 5601
     protocol    = "tcp"
     cidr_blocks = ["10.0.0.0/16"]
   }
