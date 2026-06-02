@@ -12,10 +12,17 @@ resource "aws_instance" "administration" {
   key_name = aws_key_pair.deployer.key_name
 
   vpc_security_group_ids = [aws_security_group.administration_sg.id]
+  iam_instance_profile = aws_iam_instance_profile.ansible_profile.name
 
   user_data = <<-EOF
               #!/bin/bash
               apt update -y
+              sudo apt install -y pipx
+              pipx ensurepath
+              exec $SHELL
+              pipx install --include-deps ansible
+              echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+              source ~/.bashrc
               EOF
 
   tags = merge(
@@ -62,7 +69,7 @@ resource "aws_instance" "elasticsearch" {
   associate_public_ip_address = false
   key_name = aws_key_pair.deployer.key_name
 
-  vpc_security_group_ids = [aws_security_group.elastic-sg.id]
+  vpc_security_group_ids = [aws_security_group.elastic_sg.id]
 
   user_data = <<-EOF
               #!/bin/bash
@@ -87,7 +94,7 @@ resource "aws_instance" "kibana" {
   associate_public_ip_address = false
   key_name = aws_key_pair.deployer.key_name
 
-  vpc_security_group_ids = [aws_security_group.kibana-sg.id]
+  vpc_security_group_ids = [aws_security_group.kibana_sg.id]
 
   user_data = <<-EOF
               #!/bin/bash
@@ -231,7 +238,7 @@ resource "aws_security_group" "elastic_sg"{
   }
 
   tags = {
-    Name = "elastic-sg"
+    Name = "elastic_sg"
   }
 }
 
@@ -270,7 +277,7 @@ resource "aws_security_group" "kibana_sg" {
   }
 
   tags = {
-    Name = "kibana-sg"
+    Name = "kibana_sg"
   }
 }
 
@@ -299,7 +306,7 @@ resource "aws_security_group" "administration_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
   tags = {
-    Name = "administration-sg"
+    Name = "administration_sg"
   }
 }
 
@@ -328,9 +335,38 @@ resource "aws_security_group" "webserver_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
   tags = {
-    Name = "webserver-sg"
+    Name = "webserver_sg"
   }
 }
+
+#-------------STS role------------------------------------
+resource "aws_iam_role" "ansible_role" {
+  name = "ansible-ec2-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      },
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+#--------------policy role------------------------------------
+resource "aws_iam_role_policy_attachment" "ec2_read" {
+  role       = aws_iam_role.ansible_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
+}
+
+#---------------Instance Profile--------------------------------
+resource "aws_iam_instance_profile" "ansible_profile" {
+  name = "ansible-profile"
+  role = aws_iam_role.ansible_role.name
+}
+
 
 #--------------Key pair --------------------------
 resource "aws_key_pair" "deployer" {

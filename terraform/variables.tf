@@ -25,7 +25,7 @@ variable "instance_type1" {
 variable "instance_type2" {
   description = "type d'instance EC2 pour ElasticSearch"
   type        = string
-  default     = "t3.medium"
+  default     = "c7i-flex.large"
 }
 
 variable "common_tags" {
