@@ -4,3 +4,6 @@
 *.crt
 *.log
 .vault-token
+.terraform/
+terraform.tfstate
+*.tfstate.backup
