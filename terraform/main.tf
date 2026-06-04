@@ -12,7 +12,7 @@ resource "aws_instance" "administration" {
   key_name = aws_key_pair.deployer.key_name
 
   vpc_security_group_ids = [aws_security_group.administration_sg.id]
-  iam_instance_profile = aws_iam_instance_profile.ansible_profile.name
+  iam_instance_profile = aws_iam_instance_profile.ansible_manager_profile.name
 
   user_data = <<-EOF
               #!/bin/bash
@@ -42,7 +42,7 @@ resource "aws_instance" "webserver" {
   subnet_id     = aws_subnet.public.id
   associate_public_ip_address = true
   key_name = aws_key_pair.deployer.key_name
-
+  iam_instance_profile = aws_iam_instance_profile.worker_profile.name
   vpc_security_group_ids = [aws_security_group.webserver_sg.id]
 
   user_data = <<-EOF
@@ -68,7 +68,7 @@ resource "aws_instance" "elasticsearch" {
   subnet_id     = aws_subnet.private.id
   associate_public_ip_address = false
   key_name = aws_key_pair.deployer.key_name
-
+  iam_instance_profile = aws_iam_instance_profile.ansible_worker_profile.name
   vpc_security_group_ids = [aws_security_group.elastic_sg.id]
 
   user_data = <<-EOF
@@ -93,7 +93,7 @@ resource "aws_instance" "kibana" {
   subnet_id     = aws_subnet.private.id
   associate_public_ip_address = false
   key_name = aws_key_pair.deployer.key_name
-
+  iam_instance_profile = aws_iam_instance_profile.ansible_worker_profile.name
   vpc_security_group_ids = [aws_security_group.kibana_sg.id]
 
   user_data = <<-EOF
@@ -209,13 +209,6 @@ resource "aws_security_group" "elastic_sg"{
   vpc_id = aws_vpc.main.id
 
   ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16","mon adresse publique"]
-  }
-
-  ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
@@ -247,12 +240,6 @@ resource "aws_security_group" "elastic_sg"{
 resource "aws_security_group" "kibana_sg" {
   vpc_id = aws_vpc.main.id
 
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16","mon adresse publique"]
-  }
 
   ingress {
     from_port   = 443
@@ -321,13 +308,6 @@ resource "aws_security_group" "webserver_sg" {
     cidr_blocks = ["mon adresse publique"]
   }
 
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["mon adresse publique"]
-  }
-
   egress {
     from_port   = 0
     to_port     = 0
@@ -340,8 +320,8 @@ resource "aws_security_group" "webserver_sg" {
 }
 
 #-------------STS role------------------------------------
-resource "aws_iam_role" "ansible_role" {
-  name = "ansible-ec2-role"
+resource "aws_iam_role" "ansible_manager_role" {
+  name = "ansible-manager-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
@@ -355,16 +335,48 @@ resource "aws_iam_role" "ansible_role" {
   })
 }
 
-#--------------policy role------------------------------------
+resource "aws_iam_role" "ansible_worker_role" {
+  name = "ansible-worker-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      },
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+
+#-------------policy role SSM-----------------------------------
+resource "aws_iam_role_policy_attachment" "ansible_ssm_attach_to_worker" {
+  role       = aws_iam_role.ansible_worker_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_role_policy_attachment" "ansible_ssm_attach_to_manager" {
+  role       = aws_iam_role.ansible_manager_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMFullAccess"
+}
+
+#--------------policy role EC2 Retrieve-------------------------
 resource "aws_iam_role_policy_attachment" "ec2_read" {
-  role       = aws_iam_role.ansible_role.name
+  role       = aws_iam_role.ansible_manager_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
 }
 
 #---------------Instance Profile--------------------------------
-resource "aws_iam_instance_profile" "ansible_profile" {
-  name = "ansible-profile"
-  role = aws_iam_role.ansible_role.name
+resource "aws_iam_instance_profile" "ansible_manager_profile" {
+  name = "ansible-manager-profile"
+  role = aws_iam_role.ansible_manager_role.name
+}
+
+resource "aws_iam_instance_profile" "ansible_worker_profile" {
+  name = "ansible-worker-profile"
+  role = aws_iam_role.ansible_worker_role.name
 }
 
 

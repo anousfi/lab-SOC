@@ -7,13 +7,10 @@ filters:
   tag:Environment: lab
 
 hostnames:
-  - tag:Name
-  - dns-name
-  - private-ip-address
+  - instance-id
 
 compose:
-  ansible_host: private_ip_address
-  ansible_user: "'ubuntu'"
+  ansible_connection: amazon.aws.aws_ssm
 
 keyed_groups:
   - key: tags.Role
