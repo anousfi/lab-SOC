@@ -16,13 +16,10 @@ resource "aws_instance" "administration" {
 
   user_data = <<-EOF
               #!/bin/bash
+              set -euxo pipefail
               apt update -y
               sudo apt install -y pipx
-              pipx ensurepath
-              exec $SHELL
-              pipx install --include-deps ansible
-              echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-              source ~/.bashrc
+              pipx install --global --include-deps ansible
               EOF
 
   tags = merge(
@@ -276,14 +273,14 @@ resource "aws_security_group" "administration_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["mon adresse publique"]
+    cidr_blocks = ["public address"]
   }
 
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["mon adresse publique"]
+    cidr_blocks = ["public address"]
   }
 
   egress {
@@ -305,7 +302,7 @@ resource "aws_security_group" "webserver_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["mon adresse publique"]
+    cidr_blocks = ["public address"]
   }
 
   egress {
@@ -350,6 +347,47 @@ resource "aws_iam_role" "ansible_worker_role" {
   })
 }
 
+#------------policy on S3 bucket -------------------------------
+resource "aws_iam_policy" "s3_full_access" {
+  name_prefix        = "s3-bucket_full_access"
+  description = "Full access to a specific S3 bucket"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowAllOnSpecificBucket"
+        Effect = "Allow"
+        Action = "s3:*"
+        Resource = [
+          "arn:aws:s3:::aws-s3-soc-lab-253490786526-eu-west-3-an",
+          "arn:aws:s3:::aws-s3-soc-lab-253490786526-eu-west-3-an/*"
+        ]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "s3_get_commands" {
+  name_prefix        = "s3-bucket-get-commands"
+  description = "restricted access to a specific S3 bucket"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowAllOnSpecificBucket"
+        Effect = "Allow"
+        Action = "s3:GetObject"
+        Resource = [
+          "arn:aws:s3:::aws-s3-soc-lab-253490786526-eu-west-3-an",
+          "arn:aws:s3:::aws-s3-soc-lab-253490786526-eu-west-3-an/*"
+        ]
+      }
+    ]
+  })
+}
+
 
 #-------------policy role SSM-----------------------------------
 resource "aws_iam_role_policy_attachment" "ansible_ssm_attach_to_worker" {
@@ -360,6 +398,18 @@ resource "aws_iam_role_policy_attachment" "ansible_ssm_attach_to_worker" {
 resource "aws_iam_role_policy_attachment" "ansible_ssm_attach_to_manager" {
   role       = aws_iam_role.ansible_manager_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMFullAccess"
+}
+
+
+#--------------policy role S3------------------------------------
+resource "aws_iam_role_policy_attachment" "s3_rights_to_manager" {
+  role       = aws_iam_role.ansible_manager_role.name
+  policy_arn = aws_iam_policy.s3_full_access.arn
+}
+
+resource "aws_iam_role_policy_attachment" "s3_rights_to_worker" {
+  role       = aws_iam_role.ansible_worker_role.name
+  policy_arn = aws_iam_policy.s3_get_commands.arn
 }
 
 #--------------policy role EC2 Retrieve-------------------------
