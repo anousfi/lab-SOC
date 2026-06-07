@@ -1,48 +1,80 @@
 # 1. Activer le moteur de secrets PKI
-- name: Activer PKI backend
-  community.hashi_vault.vault_pki_secret_backend:
+- name: Vérifier si PKI est déjà monté
+  community.hashi_vault.vault_read:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    path: "{{ pki_path }}"
-    description: "PKI du lab"
-    max_lease_ttl: "{{ pki_ttl }}"
+    path: "/sys/mounts"
+  register: existing_mounts
 
-# 2. Générer la CA racine
-- name: Générer CA racine
-  community.hashi_vault.vault_pki_root_generate:
+- name: Activer PKI backend
+  community.hashi_vault.vault_write:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    path: "{{ pki_path }}"
-    common_name: "{{ pki_common_name }}"
-    ttl: "{{ pki_ttl }}"
+    path: "/sys/mounts/{{ pki_path }}"
+    data:
+      type: pki
+      description: "PKI du lab"
+  when: pki_path + '/' not in existing_mounts.data
+
+- name: Configurer le TTL du mount PKI
+  community.hashi_vault.vault_write:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    path: "/sys/mounts/{{ pki_path }}/tune"
+    data:
+      max_lease_ttl: "{{ pki_ttl }}"
+
+# 2. Vérifier la CA racine
+- name: Vérifier si CA racine existe déjà
+  community.hashi_vault.vault_read:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    path: "{{ pki_path }}/cert/ca"
+  register: existing_ca
+  ignore_errors: true
+
+# 3. Générer la CA racine
+- name: Générer CA racine
+  community.hashi_vault.vault_write:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    path: "{{ pki_path }}/root/generate/internal"
+    data:
+      common_name: "{{ pki_common_name }}"
+      ttl: "{{ pki_ttl }}"
   register: root_ca
-  when: root_ca.data is not defined
+  when: existing_ca is failed
 
 - name: Store CA in Vault
   community.hashi_vault.vault_kv2_write:
-    path: secret/pki/ca
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: secret
+    path: pki/ca
     data:
       certificate: "{{ root_ca.data.certificate }}"
+  when: root_ca is not skipped and root_ca.data | default({}) | json_query('certificate') is not none
+  no_log: true
 
-# 3. Configurer les URLs
+# 4. Configurer les URLs
 - name: Configurer URLs
-  community.hashi_vault.vault_pki_config_urls:
+  community.hashi_vault.vault_write:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    path: "{{ pki_path }}"
-    issuing_certificates: "{{ vault_url }}/v1/{{ pki_path }}/ca"
-    crl_distribution_points: "{{ vault_url }}/v1/{{ pki_path }}/crl"
-    create: false
+    path: "{{ pki_path }}/config/urls"
+    data:
+      issuing_certificates: "{{ vault_url }}/v1/{{ pki_path }}/ca"
+      crl_distribution_points: "{{ vault_url }}/v1/{{ pki_path }}/crl"
 
-# 4. Créer un rôle PKI
+# 5. Créer un rôle PKI
 - name: Créer le rôle PKI
-  community.hashi_vault.vault_pki_role:
+  community.hashi_vault.vault_write:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    path: "{{ pki_path }}"
-    name: "{{ pki_role_name }}"
-    ttl: "720h"
-    allowed_domains:
-      - lab.local
-    allow_subdomains: true
-    allow_ip_sans: true
+    path: "{{ pki_path }}/roles/{{ pki_role_name }}"
+    data:
+      ttl: "{{ pki_role_ttl }}"
+      allowed_domains:
+        - lab.local
+      allow_subdomains: true
+      allow_ip_sans: true

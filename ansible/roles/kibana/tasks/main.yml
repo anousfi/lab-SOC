@@ -1,3 +1,11 @@
+- name: Get elastic secret from Vault
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: secret
+    path: elastic
+  register: elastic_secret
+  no_log: true
 
 - name: Installer kibana
   ansible.builtin.apt:
@@ -8,30 +16,33 @@
   ansible.builtin.file:
     path: /etc/kibana/certs
     state: directory
+    owner: kibana
+    group: kibana
     mode: "0700"
 
 - name: Copy kibana cert
   ansible.builtin.copy:
     src: "/tmp/certs/kibana/kibana.crt"
     dest: /etc/kibana/certs/kibana.crt
+    owner: kibana
+    group: kibana
     mode: "0644"
 
 - name: Copy Kibana key
   ansible.builtin.copy:
     src: "/tmp/certs/kibana/kibana.key"
     dest: /etc/kibana/certs/kibana.key
+    owner: kibana
+    group: kibana
     mode: "0600"
 
 - name: Copy CA
   ansible.builtin.copy:
     src: "/tmp/pki/ca.crt"
     dest: /etc/kibana/certs/ca.crt
-
-- ansible.posix.firewalld:
-    port: "{{ kibana_port }}/tcp"
-    permanent: true
-    immediate: true
-    state: enabled
+    owner: kibana
+    group: kibana
+    mode: "0644"
 
 - name: Create Kibana keystore
   ansible.builtin.command:
@@ -42,8 +53,34 @@
   community.hashi_vault.vault_kv2_get:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    path: "secret/kibana"
+    engine_mount_point: secret
+    path: kibana
   register: kibana_secret
+  no_log: true
+
+- name: Wait for Elasticsearch
+  ansible.builtin.uri:
+    url: "https://{{ elasticsearch_host }}:9200/_cluster/health"
+    method: GET
+    user: elastic
+    password: "{{ elastic_secret.data.data.elastic_password }}"
+    validate_certs: true
+    ca_path: /etc/kibana/certs/ca.crt
+  register: es_health
+  until: es_health.status == 200
+  retries: 30
+  delay: 5
+
+- name: Vérifier si le mot de passe kibana_system est déjà correct
+  ansible.builtin.uri:
+    url: "https://{{ elasticsearch_host }}:9200/_security/user/kibana_system"
+    method: GET
+    user: kibana_system
+    password: "{{ kibana_secret.data.data.kibana_password }}"
+    validate_certs: true
+    ca_path: /etc/kibana/certs/ca.crt
+  register: kibana_auth_check
+  ignore_errors: true
   no_log: true
 
 - name: Set kibana_system password
@@ -63,7 +100,7 @@
     ca_path: /etc/kibana/certs/ca.crt
     status_code: 200
   no_log: true
-  changed_when: false
+  when: kibana_auth_check is failed
 
 - name: Add kibana_system password to keystore
   ansible.builtin.command:
@@ -74,7 +111,7 @@
   stdin: "{{ kibana_secret.data.data.kibana_password }}"
   no_log: true
   register: keystore_add
-  changed_when: "'Added' in keystore_add.stdout"
+  changed_when: keystore_add.rc == 0
   notify: restart kibana
 
 - name: configurer kibana vers elasticsearch
@@ -89,21 +126,8 @@
     state: started
     enabled: true
 
-- name: Flush handlers
-  meta: flush_handlers
-
-- name: Wait for Elasticsearch
-  ansible.builtin.uri:
-    url: "https://{{ elasticsearch_host }}:9200/_cluster/health"
-    method: GET
-    user: elastic
-    password: "{{ elastic_secret.data.data.elastic_password }}"
-    validate_certs: true
-    ca_path: /etc/kibana/certs/ca.crt
-  register: es_health
-  until: es_health.status == 200
-  retries: 30
-  delay: 5
+- name: flush_handlers
+  ansible.builtin.meta: flush_handlers
     
 - name: Vérifier Kibana
   ansible.builtin.uri:

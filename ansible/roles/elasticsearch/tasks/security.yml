@@ -1,25 +1,72 @@
+# security.yml
+- name: Collecter l'état des services
+  ansible.builtin.service_facts:
+
 - name: Get secrets from Vault
   community.hashi_vault.vault_kv2_get:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    path: "secret/elastic"
+    engine_mount_point: secret
+    path: elastic
   register: elastic_secret
-  failed_when: false
+  ignore_errors: true
   no_log: true
 
 - name: Fail if secret missing
   ansible.builtin.fail:
     msg: "Elastic password missing in Vault"
-  when: elastic_secret.data is not defined
+  when: elastic_secret is failed
 
-- name: Ensure elastic password is correct
+- name: Démarrer Elasticsearch
+  ansible.builtin.systemd:
+    name: elasticsearch
+    state: "{{ 'restarted' if ansible_facts.services['elasticsearch.service'].state | default('') == 'running' else 'started' }}"
+    enabled: true
+
+- name: Attendre qu'Elasticsearch soit prêt
+  ansible.builtin.uri:
+    url: "https://{{ elasticsearch_host }}:9200"
+    validate_certs: true
+    ca_path: /etc/elasticsearch/certs/ca.crt
+  register: es_health
+  until: es_health.status == 200
+  retries: 10
+  delay: 10
+
+- name: Vérifier si les credentials Vault sont déjà valides
+  ansible.builtin.uri:
+    url: "https://{{ elasticsearch_host }}:9200"
+    method: GET
+    user: elastic
+    password: "{{ elastic_secret.data.data.elastic_password }}"
+    validate_certs: true
+    ca_path: /etc/elasticsearch/certs/ca.crt
+  register: auth_check
+  ignore_errors: true
+  no_log: true
+
+- name: Initialiser le mot de passe elastic (bootstrap)
+  ansible.builtin.command:
+    cmd: >
+      /usr/share/elasticsearch/bin/elasticsearch-reset-password
+      -u elastic --batch --url https://{{ elasticsearch_host }}:9200
+  environment:
+    ES_JAVA_OPTS: ""
+  register: reset_result
+  changed_when: reset_result.rc == 0
+  no_log: true
+  when: auth_check is failed
+
+- name: Set elastic password via API
   ansible.builtin.uri:
     url: "https://{{ elasticsearch_host }}:9200/_security/user/elastic/_password"
     method: POST
     user: elastic
-    password: "{{ elastic_secret.data.data.elastic_password }}"
+    password: "{{ reset_result.stdout | default('') | regex_search('New value: (.+)', '\\1') | first | default('') }}"
     body_format: json
     body:
       password: "{{ elastic_secret.data.data.elastic_password }}"
     validate_certs: true
     ca_path: /etc/elasticsearch/certs/ca.crt
+  no_log: true
+  when: auth_check is failed

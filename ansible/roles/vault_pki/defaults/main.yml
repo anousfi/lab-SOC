@@ -3,3 +3,4 @@ pki_path: "pki"
 pki_common_name: "CA lab soc"
 pki_ttl: "87600h" # 10 ans
 pki_role_name: "mon-role-pki"
+pki_role_ttl: "360h"

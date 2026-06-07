@@ -18,8 +18,10 @@ resource "aws_instance" "administration" {
               #!/bin/bash
               set -euxo pipefail
               apt update -y
-              sudo apt install -y pipx
-              pipx install --global --include-deps ansible
+              apt install -y python3-pip python3-venv pipx
+              pipx install --include-deps ansible
+              ln -s /root/.local/bin/ansible /usr/local/bin/ansible
+              ln -s /root/.local/bin/ansible-playbook /usr/local/bin/ansible-playbook
               EOF
 
   tags = merge(
@@ -273,14 +275,14 @@ resource "aws_security_group" "administration_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["public address"]
+    cidr_blocks = ["41.250.238.38/32"]
   }
 
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["public address"]
+    cidr_blocks = ["41.250.238.38/32"]
   }
 
   egress {
@@ -302,7 +304,7 @@ resource "aws_security_group" "webserver_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["public address"]
+    cidr_blocks = ["41.250.238.38/32"]
   }
 
   egress {

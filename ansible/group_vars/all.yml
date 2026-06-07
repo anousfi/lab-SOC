@@ -1,5 +1,6 @@
 ansible_connection: amazon.aws.aws_ssm
 ansible_aws_ssm_region: eu-west-3
+ansible_aws_ssm_bucket_name: aws-s3-soc-lab-253490786526-eu-west-3-an
 ansible_shell_type: sh
 ansible_shell_executable: /bin/sh
 ansible_python_interpreter: /usr/bin/python3

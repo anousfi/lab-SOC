@@ -5,10 +5,20 @@
     mode: "0700"
   loop: "{{ services }}"
 
+- name: Create CA directory
+  ansible.builtin.file:
+    path: /tmp/pki
+    state: directory
+    mode: "0755"
+
 - name: Get CA from Vault
   community.hashi_vault.vault_kv2_get:
-    path: secret/pki/ca
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: secret
+    path: pki/ca
   register: ca_data
+  no_log: true
 
 - name: Generate certificates for services
   community.hashi_vault.vault_pki_generate_certificate:
@@ -17,16 +27,16 @@
     engine_mount_point: "{{ pki_path }}"
     role_name: "{{ pki_role_name }}"
     common_name: "{{ item.cn }}"
-    alt_names: "{{ item.dns | default([item.cn]) }}"
+    alt_names: "{{ item.dns | default([item.cn]) | join(',') }}"
     ip_sans: >-
       {{
         (['127.0.0.1'] +
         ([hostvars[groups[item.host][0]].ansible_host]
           if (groups[item.host] is defined and groups[item.host] | length > 0)
           else [])
-        )
+        ) | join(',')
       }}
-    ttl: "720h"
+    ttl: "{{ cert_ttl }}"
   loop: "{{ services }}"
   register: cert_results
   no_log: true
@@ -56,3 +66,4 @@
     dest: /tmp/pki/ca.crt
     content: "{{ ca_data.data.data.certificate }}"
     mode: "0644"
+  no_log: true

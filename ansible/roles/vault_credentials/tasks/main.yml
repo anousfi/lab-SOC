@@ -1,29 +1,58 @@
+- name: Vérifier si le secret elastic existe déjà
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: secret
+    path: elastic
+  register: elastic_secret
+  ignore_errors: true
+  no_log: true
+
 - name: Generate elastic password
   ansible.builtin.set_fact:
     elastic_password: "{{ lookup('ansible.builtin.password', '/dev/null length=24 chars=ascii_letters,digits') }}"
-  when: elastic_secret.data is not defined
+  when: elastic_secret is failed
   no_log: true
 
 - name: Store elastic password
   community.hashi_vault.vault_kv2_write:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    path: "secret/elastic"
+    engine_mount_point: secret
+    path: elastic
     data:
       elastic_password: "{{ elastic_password }}"
-  when: elastic_secret.data is not defined
+  when: elastic_secret is failed
+  no_log: true
+
+- name: Vérifier si le secret kibana existe déjà
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: secret
+    path: kibana
+  register: kibana_secret
+  ignore_errors: true
   no_log: true
 
 - name: Generate kibana password
   ansible.builtin.set_fact:
     kibana_password: "{{ lookup('ansible.builtin.password', '/dev/null length=24 chars=ascii_letters,digits') }}"
   no_log: true
+  when: kibana_secret is failed
 
 - name: Store kibana password
   community.hashi_vault.vault_kv2_write:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    path: "secret/kibana"
+    engine_mount_point: secret
+    path: kibana
     data:
       kibana_password: "{{ kibana_password }}"
   no_log: true
+  when: kibana_secret is failed
+
+- name: Purger les facts sensibles
+  ansible.builtin.set_fact:
+    elastic_password: ""
+    kibana_password: ""

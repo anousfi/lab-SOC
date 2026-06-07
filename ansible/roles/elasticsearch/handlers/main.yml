@@ -1,5 +1,10 @@
 - name: restart elasticsearch
-  ansible.builtin.systemd:
-    name: elasticsearch
-    state: restarted
-    daemon_reload: true
+  block:
+    - name: Collecter l'état du service
+      ansible.builtin.service_facts:
+
+    - name: Démarrer ou redémarrer
+      ansible.builtin.systemd:
+        name: elasticsearch
+        state: "{{ 'restarted' if ansible_facts.services['elasticsearch.service'].state == 'running' else 'started' }}"
+        daemon_reload: true

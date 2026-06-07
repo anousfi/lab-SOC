@@ -21,3 +21,5 @@ services:
     dns:
       - filebeat.lab.local
     host: role_filebeat
+
+cert_ttl: "720h"

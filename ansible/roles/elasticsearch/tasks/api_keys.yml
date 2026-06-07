@@ -1,10 +1,20 @@
+- name: Get elastic secret from Vault
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: secret
+    path: elastic
+  register: elastic_secret
+  no_log: true
+
 - name: Get Filebeat API key from Vault
   community.hashi_vault.vault_kv2_get:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    path: "secret/filebeat_api_key"
+    engine_mount_point: secret
+    path: filebeat_api_key
   register: filebeat_secret
-  failed_when: false
+  ignore_errors: true
   no_log: true
 
 - name: Create Filebeat API key
@@ -21,25 +31,30 @@
           cluster:
             - monitor
             - manage_ilm
+            - manage_own_api_key
           index:
-            - names: ["filebeat-*"]
+            - names: 
+                - "filebeat-*"
               privileges:
                 - write
+                - create_index
                 - create_doc
+                - manage
     validate_certs: true
     ca_path: /etc/elasticsearch/certs/ca.crt
-  register: filebeat_api_key
-  when: filebeat_secret.data is not defined
+  register: filebeat_api_key_result
+  when: filebeat_secret is failed
   no_log: true
 
 - name: Store Filebeat API key in Vault
   community.hashi_vault.vault_kv2_write:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    path: "secret/filebeat_api_key"
+    engine_mount_point: secret
+    path: filebeat_api_key
     data:
-      api_key: "{{ filebeat_api_key.json.id }}:{{ filebeat_api_key.json.api_key }}"
-  when: filebeat_secret.data is not defined
+      api_key: "{{ filebeat_api_key_result.json.id }}:{{ filebeat_api_key_result.json.api_key }}"
+  when: filebeat_secret is failed
   no_log: true
 
 - name: Set Filebeat API key fact
@@ -47,8 +62,7 @@
     filebeat_api_key: >-
       {{
         filebeat_secret.data.data.api_key
-        if filebeat_secret.data is defined
-        else filebeat_api_key.json.id ~ ':' ~ filebeat_api_key.json.api_key
+        if filebeat_secret is not failed
+        else filebeat_api_key_result.json.id ~ ':' ~ filebeat_api_key_result.json.api_key
       }}
-  changed_when: false
   no_log: true
