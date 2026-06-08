@@ -52,8 +52,8 @@
     engine_mount_point: secret
     path: pki/ca
     data:
-      certificate: "{{ root_ca.data.certificate }}"
-  when: root_ca is not skipped and root_ca.data | default({}) | json_query('certificate') is not none
+      certificate: "{{ root_ca.data.data.certificate }}"
+  when: not (root_ca.skipped | default(false))
   no_log: true
 
 # 4. Configurer les URLs

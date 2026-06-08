@@ -22,7 +22,7 @@ resource "aws_instance" "administration" {
 
               #Ansible
               PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install --include-deps ansible
-              PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx inject ansible boto3 botocore
+              PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx inject ansible boto3 botocore hvac
 
               #Vault
               wget -O - https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg

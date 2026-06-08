@@ -1,4 +1,3 @@
-vault_url: "https://127.0.0.1:8200"
 pki_path: "pki"
 pki_common_name: "CA lab soc"
 pki_ttl: "87600h" # 10 ans
