@@ -71,7 +71,7 @@
     cmd: >
       /usr/share/filebeat/bin/filebeat keystore add
       ES_API_KEY --stdin 
-  stdin: "{{ filebeat_api_key_secret.data.data.api_key }}"
+    stdin: "{{ filebeat_api_key_secret.data.data.api_key }}"
   register: keystore_apikey
   changed_when: keystore_apikey.rc == 0
   failed_when: keystore_apikey.rc != 0 and 'already exists' not in keystore_apikey.stderr
@@ -92,7 +92,7 @@
     cmd: >
       /usr/share/filebeat/bin/filebeat keystore add
       KIBANA_PASSWORD --stdin
-  stdin: "{{ kibana_secret.data.data.kibana_password }}"
+    stdin: "{{ kibana_secret.data.data.kibana_password }}"
   no_log: true
   register: keystore_kibana
   changed_when: keystore_kibana.rc == 0

@@ -7,3 +7,9 @@
   register: vault_login
   no_log: true
   failed_when: vault_login.login is not defined
+
+- name: Exporter le token Vault comme fact global
+  ansible.builtin.set_fact:
+    vault_token: "{{ vault_login.login.auth.client_token }}"
+    cacheable: true
+  no_log: true

@@ -2,6 +2,7 @@
 *.pub
 id_rsa
 id_rsa.pub
+*vault_secrets*
 .aws/
 terraform.tfstate
 terraform.tfstate.backup

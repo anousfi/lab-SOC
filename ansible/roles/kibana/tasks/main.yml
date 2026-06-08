@@ -108,7 +108,7 @@
       /usr/share/kibana/bin/kibana-keystore add elasticsearch.password
       --stdin
       --force
-  stdin: "{{ kibana_secret.data.data.kibana_password }}"
+    stdin: "{{ kibana_secret.data.data.kibana_password }}"
   no_log: true
   register: keystore_add
   changed_when: keystore_add.rc == 0

@@ -19,9 +19,20 @@ resource "aws_instance" "administration" {
               set -euxo pipefail
               apt update -y
               apt install -y python3-pip python3-venv pipx
-              pipx install --include-deps ansible
-              ln -s /root/.local/bin/ansible /usr/local/bin/ansible
-              ln -s /root/.local/bin/ansible-playbook /usr/local/bin/ansible-playbook
+
+              #Ansible
+              PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install --include-deps ansible
+              PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx inject ansible boto3 botocore
+
+              #Vault
+              wget -O - https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+              echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list
+              apt update -y
+              apt install -y vault
+
+              #SSM plugin
+              curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o /tmp/session-manager-plugin.deb
+              dpkg -i /tmp/session-manager-plugin.deb
               EOF
 
   tags = merge(
@@ -275,14 +286,14 @@ resource "aws_security_group" "administration_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["41.250.238.38/32"]
+    cidr_blocks = ["105.157.153.135/32"]
   }
 
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["41.250.238.38/32"]
+    cidr_blocks = ["105.157.153.135/32"]
   }
 
   egress {
@@ -304,7 +315,7 @@ resource "aws_security_group" "webserver_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["41.250.238.38/32"]
+    cidr_blocks = ["105.157.153.135/32"]
   }
 
   egress {
