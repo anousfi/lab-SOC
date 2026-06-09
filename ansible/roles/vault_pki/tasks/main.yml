@@ -45,6 +45,19 @@
   register: root_ca
   when: existing_ca is failed
 
+# 3b. Récupérer le certificat CA existant (si déjà présente)
+- name: Récupérer CA existante
+  ansible.builtin.set_fact:
+    ca_certificate: "{{ existing_ca.data.data.certificate }}"
+  when: existing_ca is not failed
+
+
+# 3c. Utiliser le certificat fraîchement généré
+- name: Utiliser CA générée
+  ansible.builtin.set_fact:
+    ca_certificate: "{{ root_ca.data.data.certificate }}"
+  when: existing_ca is failed
+
 - name: Store CA in Vault
   community.hashi_vault.vault_kv2_write:
     url: "{{ vault_url }}"
@@ -52,8 +65,7 @@
     engine_mount_point: secret
     path: pki/ca
     data:
-      certificate: "{{ root_ca.data.data.certificate }}"
-  when: not (root_ca.skipped | default(false))
+      certificate: "{{ ca_certificate }}"
   no_log: true
 
 # 4. Configurer les URLs
