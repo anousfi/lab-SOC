@@ -19,19 +19,31 @@
 
 - name: Copy filebeat cert
   ansible.builtin.copy:
-    src: "/tmp/certs/filebeat/filebeat.crt"
     dest: /etc/filebeat/certs/filebeat.crt
+    content: >-
+      {{ cert_results.results
+         | selectattr('item.name', 'equalto', 'filebeat')
+         | map(attribute='data.data.private_key')
+         | first }}
     owner: filebeat
     group: filebeat
     mode: "0644"
+  delegate_to: localhost
+  no_log: true
 
 - name: Copy filebeat key
   ansible.builtin.copy:
-    src: "/tmp/certs/filebeat/filebeat.key"
     dest: /etc/filebeat/certs/filebeat.key
+    content: >-
+      {{ cert_results.results
+         | selectattr('item.name', 'equalto', 'filebeat')
+         | map(attribute='data.data.private_key')
+         | first }}
     owner: filebeat
     group: filebeat
     mode: "0600" 
+  delegate_to: localhost
+  no_log: true
 
 - name: Copy CA
   ansible.builtin.copy:
@@ -60,9 +72,10 @@
 - name: Get Filebeat API key from Vault
   community.hashi_vault.vault_kv2_get:
     url: "{{ vault_url }}"
-    token: "{{ vault_token }}"
+    token: "{{ hostvars['localhost']['vault_token'] }}"
     engine_mount_point: secret
     path: filebeat_api_key
+  delegate_to: localhost
   register: filebeat_api_key_secret
   no_log: true
 
@@ -81,9 +94,10 @@
 - name: Get kibana password from Vault
   community.hashi_vault.vault_kv2_get:
     url: "{{ vault_url }}"
-    token: "{{ vault_token }}"
+    token: "{{ hostvars['localhost']['vault_token'] }}"
     engine_mount_point: secret
     path: kibana
+  delegate_to: localhost
   register: kibana_secret
   no_log: true
 

@@ -4,10 +4,7 @@ services:
     dns:
       - elasticsearch.lab.local
       - elasticsearch
-      - localhost
-    ips:
-      - 127.0.0.1
-    host: role_elasticsearch
+    host: role_elasticSearch
 
   - name: kibana
     cn: kibana.lab.local
@@ -20,6 +17,6 @@ services:
     cn: filebeat.lab.local
     dns:
       - filebeat.lab.local
-    host: role_filebeat
+    host: role_webserver
 
 cert_ttl: "720h"

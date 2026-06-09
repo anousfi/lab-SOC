@@ -88,5 +88,10 @@
       ttl: "{{ pki_role_ttl }}"
       allowed_domains:
         - lab.local
+        - elasticsearch
+        - kibana
+        - filebeat
+        - localhost
       allow_subdomains: true
+      allow_bare_domains: true
       allow_ip_sans: true

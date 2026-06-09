@@ -286,14 +286,14 @@ resource "aws_security_group" "administration_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["105.157.153.135/32"]
+    cidr_blocks = ["my public address"]
   }
 
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["105.157.153.135/32"]
+    cidr_blocks = ["my public address"]
   }
 
   egress {
@@ -315,7 +315,7 @@ resource "aws_security_group" "webserver_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["105.157.153.135/32"]
+    cidr_blocks = ["my public address"]
   }
 
   egress {

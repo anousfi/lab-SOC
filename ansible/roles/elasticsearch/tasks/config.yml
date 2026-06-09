@@ -8,21 +8,33 @@
 
 - name: Copy cert
   ansible.builtin.copy:
-    src: "/tmp/certs/elasticsearch/elasticsearch.crt"
     dest: /etc/elasticsearch/certs/elasticsearch.crt
+    content: >-
+      {{ cert_results.results
+         | selectattr('item.name', 'equalto', 'elasticsearch')
+         | map(attribute='data.data.crt')
+         | first }}
     owner: elasticsearch
     group: elasticsearch
     mode: "0644"
+  delegate_to: localhost
+  no_log: true
   notify: restart elasticsearch
   
 
 - name: Copy key
   ansible.builtin.copy:
-    src: "/tmp/certs/elasticsearch/elasticsearch.key"
     dest: /etc/elasticsearch/certs/elasticsearch.key
+    content: >-
+      {{ cert_results.results
+         | selectattr('item.name', 'equalto', 'elasticsearch')
+         | map(attribute='data.data.private_key')
+         | first }}
     owner: elasticsearch
     group: elasticsearch
     mode: "0600"
+  delegate_to: localhost
+  no_log: true
   notify: restart elasticsearch
 
 - name: Copy CA

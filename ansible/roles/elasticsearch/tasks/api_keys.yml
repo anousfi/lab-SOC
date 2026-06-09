@@ -1,18 +1,20 @@
 - name: Get elastic secret from Vault
   community.hashi_vault.vault_kv2_get:
     url: "{{ vault_url }}"
-    token: "{{ vault_token }}"
+    token: "{{ hostvars['localhost']['vault_token'] }}"
     engine_mount_point: secret
     path: elastic
+  delegate_to: localhost
   register: elastic_secret
   no_log: true
 
 - name: Get Filebeat API key from Vault
   community.hashi_vault.vault_kv2_get:
     url: "{{ vault_url }}"
-    token: "{{ vault_token }}"
+    token: "{{ hostvars['localhost']['vault_token'] }}"
     engine_mount_point: secret
     path: filebeat_api_key
+  delegate_to: localhost
   register: filebeat_secret
   ignore_errors: true
   no_log: true
@@ -49,11 +51,12 @@
 - name: Store Filebeat API key in Vault
   community.hashi_vault.vault_kv2_write:
     url: "{{ vault_url }}"
-    token: "{{ vault_token }}"
+    token: "{{ hostvars['localhost']['vault_token'] }}"
     engine_mount_point: secret
     path: filebeat_api_key
     data:
       api_key: "{{ filebeat_api_key_result.json.id }}:{{ filebeat_api_key_result.json.api_key }}"
+  delegate_to: localhost
   when: filebeat_secret is failed
   no_log: true
 

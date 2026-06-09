@@ -20,7 +20,27 @@
   register: ca_data
   no_log: true
 
-- name: Generate certificates for services
+# Vérifications
+- name: Vérifier si les certificats existent déjà
+  ansible.builtin.stat:
+    path: "/tmp/certs/{{ item.name }}/{{ item.name }}.crt"
+  loop: "{{ services }}"
+  register: cert_files
+
+- name: Vérifier expiration des certificats existants
+  ansible.builtin.shell: |
+    openssl x509 -checkend 604800 -noout \
+      -in /tmp/certs/{{ item.name }}/{{ item.name }}.crt
+  loop: "{{ services }}"
+  loop_control:
+    index_var: idx
+  when: cert_files.results[idx].stat.exists   # ← seulement si le fichier existe
+  register: cert_expiry
+  failed_when: false
+  changed_when: false
+
+# Génération unique avec les deux conditions combinées
+- name: Générer cert si absent ou expirant sous 7 jours
   community.hashi_vault.vault_pki_generate_certificate:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
@@ -30,35 +50,43 @@
     alt_names: "{{ item.dns | default([item.cn]) | join(',') }}"
     ip_sans: >-
       {{
-        (['127.0.0.1'] +
-        ([hostvars[groups[item.host][0]].ansible_host]
-          if (groups[item.host] is defined and groups[item.host] | length > 0)
-          else [])
-        ) | join(',')
+        groups[item.host] | default([])
+          | map('extract', hostvars, 'ansible_host')
+          | select('defined')
+          | list
+          | join(',')
       }}
     ttl: "{{ cert_ttl }}"
   loop: "{{ services }}"
+  loop_control:
+    index_var: idx
+  when: >
+    not cert_files.results[idx].stat.exists or
+    (cert_expiry.results[idx].rc | default(0)) != 0
   register: cert_results
   no_log: true
 
+# Sauvegarde uniquement des certs fraîchement générés
 - name: Save certificates
   ansible.builtin.copy:
     dest: "/tmp/certs/{{ item.item.name }}/{{ item.item.name }}.crt"
-    content: "{{ item.data.certificate }}"
+    content: "{{ item.data.data.certificate }}"
     owner: root
     group: root
     mode: "0600"
   loop: "{{ cert_results.results }}"
+  when: not item.skipped | default(false)   # ← ignore les items skippés
   no_log: true
 
 - name: Save private keys
   ansible.builtin.copy:
     dest: "/tmp/certs/{{ item.item.name }}/{{ item.item.name }}.key"
-    content: "{{ item.data.private_key }}"
+    content: "{{ item.data.data.private_key }}"
     owner: root
     group: root
     mode: "0600"
   loop: "{{ cert_results.results }}"
+  when: not item.skipped | default(false)   # ← ignore les items skippés
   no_log: true
 
 - name: Save CA

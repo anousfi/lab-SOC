@@ -1,9 +1,10 @@
 - name: Get elastic secret from Vault
   community.hashi_vault.vault_kv2_get:
     url: "{{ vault_url }}"
-    token: "{{ vault_token }}"
+    token: "{{ hostvars['localhost']['vault_token'] }}"
     engine_mount_point: secret
     path: elastic
+  delegate_to: localhost
   register: elastic_secret
   no_log: true
 
@@ -22,19 +23,31 @@
 
 - name: Copy kibana cert
   ansible.builtin.copy:
-    src: "/tmp/certs/kibana/kibana.crt"
     dest: /etc/kibana/certs/kibana.crt
+    content: >-
+      {{ cert_results.results
+         | selectattr('item.name', 'equalto', 'kibana')
+         | map(attribute='data.data.crt')
+         | first }}
     owner: kibana
     group: kibana
     mode: "0644"
+  delegate_to: localhost
+  no_log: true
 
 - name: Copy Kibana key
   ansible.builtin.copy:
-    src: "/tmp/certs/kibana/kibana.key"
     dest: /etc/kibana/certs/kibana.key
+    content: >-
+      {{ cert_results.results
+         | selectattr('item.name', 'equalto', 'kibana')
+         | map(attribute='data.data.private_key')
+         | first }}
     owner: kibana
     group: kibana
     mode: "0600"
+  delegate_to: localhost
+  no_log: true
 
 - name: Copy CA
   ansible.builtin.copy:
@@ -55,6 +68,7 @@
     token: "{{ vault_token }}"
     engine_mount_point: secret
     path: kibana
+  delegate_to: localhost
   register: kibana_secret
   no_log: true
 

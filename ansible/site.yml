@@ -9,7 +9,7 @@
 - hosts: role_elasticsearch
   become: true
   roles:
-    - elasticsearch
+    - elasticSearch
 
 - hosts: role_kibana
   become: true
