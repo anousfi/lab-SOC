@@ -6,41 +6,93 @@
     group: elasticsearch
     mode: "0700"
 
-- name: Copy cert
+- name: check if elastic cert exists
+  community.hashi_vault.vault_read:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: secret
+    path: tmp/certs/elastic/elastic.crt
+  delegate_to: localhost
+  register: existing_cert
+  failed_when: false
+
+- name: Récupérer Cert existante
+  ansible.builtin.set_fact:
+    elastic_cert:
+      data:
+        data:
+          certificate: "{{ existing_cert.data.data.certificate }}"
+          private_key: "{{ existing_cert.data.data.private_key }}"
+  when: existing_cert.data is defined
+
+- name: Vérifier expiration des certificats existants
+  ansible.builtin.shell: |
+    echo "{{ existing_cert.data.data.certificate }}" | \
+    openssl x509 -checkend 604800 -noout
+  register: cert_expiry
+  failed_when: false
+  changed_when: false
+  when: existing_cert.data is defined
+
+- name: Generate Elasticsearch cert from Vault
+  community.hashi_vault.vault_pki_generate_certificate:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: pki
+    role_name: "{{ elastic_role_name }}"
+    common_name: elasticSearch.lab.local
+    alt_names: elasticSearch.lab.local,elasticSearch
+  when: >
+    existing_cert.data is not defined or
+    (cert_expiry.rc | default(1)) != 0
+  delegate_to: localhost
+  register: elastic_cert
+  no_log: true
+
+- name: copy elastic cert
   ansible.builtin.copy:
     dest: /etc/elasticsearch/certs/elasticsearch.crt
-    content: >-
-      {{ cert_results.results
-         | selectattr('item.name', 'equalto', 'elasticsearch')
-         | map(attribute='data.data.crt')
-         | first }}
+    content: "{{ elastic_cert.data.data.certificate }}"
     owner: elasticsearch
     group: elasticsearch
     mode: "0644"
-  delegate_to: localhost
   no_log: true
   notify: restart elasticsearch
-  
 
-- name: Copy key
+- name: copy elastic key
   ansible.builtin.copy:
     dest: /etc/elasticsearch/certs/elasticsearch.key
-    content: >-
-      {{ cert_results.results
-         | selectattr('item.name', 'equalto', 'elasticsearch')
-         | map(attribute='data.data.private_key')
-         | first }}
+    content: "{{ elastic_cert.data.data.private_key }}"
     owner: elasticsearch
     group: elasticsearch
-    mode: "0600"
-  delegate_to: localhost
+    mode: "0644"
   no_log: true
   notify: restart elasticsearch
 
-- name: Copy CA
+- name: Store generated cert in Vault
+  community.hashi_vault.vault_write:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    path: tmp/certs/elastic/elasticsearch.crt
+    data:
+      certificate: "{{ elastic_cert.data.data.certificate }}"
+      private_key: "{{ elastic_cert.data.data.private_key }}"
+  when: elastic_cert is changed
+  no_log: true
+
+- name: Lire le CA depuis Vault
+  community.hashi_vault.vault_read:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: secret
+    path: tmp/pki/ca.crt
+  delegate_to: localhost
+  register: ca_cert
+
+- name: Copy CA vers Elasticsearch
   ansible.builtin.copy:
-    src: "/tmp/pki/ca.crt"
     dest: /etc/elasticsearch/certs/ca.crt
+    content: "{{ ca_cert.data.data.certificate }}"
     owner: elasticsearch
     group: elasticsearch
     mode: "0644"

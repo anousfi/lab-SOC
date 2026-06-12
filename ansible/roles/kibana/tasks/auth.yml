@@ -1,0 +1,15 @@
+- name: Login AppRole
+  community.hashi_vault.vault_login:
+    url: "{{ vault_url }}"
+    auth_method: approle
+    role_id: "{{ vault_role_id }}"
+    secret_id: "{{ vault_secret_id }}"
+  register: vault_login
+  no_log: true
+  failed_when: vault_login.login is not defined
+
+- name: Enregistrer le token Vault
+  ansible.builtin.set_fact:
+    vault_token: "{{ vault_login.login.auth.client_token }}"
+    cacheable: true
+  no_log: true

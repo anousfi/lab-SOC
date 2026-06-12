@@ -7,4 +7,4 @@ ansible_python_interpreter: /usr/bin/python3
 elasticsearch_host: 10.0.x.x
 elasticsearch_port: 9200
 kibana_port: 5601
-vault_url: "https://127.0.0.1:8200"
+vault_url: "https://vault.lab.local::8200"

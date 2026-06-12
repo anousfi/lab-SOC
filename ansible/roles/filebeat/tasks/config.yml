@@ -1,0 +1,190 @@
+- name: Get elastic secret from Vault
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: secret
+    path: elastic
+  delegate_to: localhost
+  register: elastic_secret
+  no_log: true
+
+- name: check if filebeat cert exists
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: secret
+    path: tmp/certs/filebeat/filebeat.crt
+  delegate_to: localhost
+  register: existing_cert
+  ignore_errors: true
+  no_log: true
+
+- name: Récupérer Cert existante
+  ansible.builtin.set_fact:
+    filebeat_cert:
+      data:
+        data:
+          certificate: "{{ existing_cert.data.data.certificate }}"
+          private_key: "{{ existing_cert.data.data.private_key }}"
+  when: existing_cert.data is defined
+
+- name: Vérifier expiration des certificats existants
+  ansible.builtin.shell: |
+    echo "{{ existing_cert.data.data.certificate }}" | \
+    openssl x509 -checkend 604800 -noout
+  register: cert_expiry
+  failed_when: false
+  changed_when: false
+  when: existing_cert.data is defined
+
+- name: Generate filebeat cert from Vault
+  community.hashi_vault.vault_pki_generate_certificate:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: pki
+    role_name: "{{ filebeat_role_name }}"
+    common_name: filebeat.lab.local
+    alt_names: filebeat.lab.local,filebeat
+  when: >
+    existing_cert.data is not defined or
+    (cert_expiry.rc | default(1)) != 0
+  delegate_to: localhost
+  register: filebeat_cert
+  no_log: true
+
+- name: Résoudre le cert final
+  ansible.builtin.set_fact:
+    final_filebeat_cert:
+      certificate: >-
+        {{ filebeat_cert.data.certificate
+           if filebeat_cert is not skipped
+           else existing_cert.data.data.certificate }}
+      private_key: >-
+        {{ filebeat_cert.data.private_key
+           if filebeat_cert is not skipped
+           else existing_cert.data.data.private_key }}
+  no_log: true
+
+- name: copy filebeat cert
+  ansible.builtin.copy:
+    dest: /etc/filebeat/certs/filebeat.crt
+    content: "{{ final_filebeat_cert.certificate }}"
+    owner: filebeat
+    group: filebeat
+    mode: "0644"
+  no_log: true
+  notify: restart filebeat
+
+- name: copy filebeat key
+  ansible.builtin.copy:
+    dest: /etc/filebeat/certs/filebeat.key
+    content: "{{ final_filebeat_cert.private_key }}"
+    owner: filebeat
+    group: filebeat
+    mode: "0644"
+  no_log: true
+  notify: restart filebeat
+
+- name: Store generated cert in Vault
+  community.hashi_vault.vault_kv2_write:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: secret
+    path: tmp/certs/filebeat/filebeat.crt
+    data:
+      certificate: "{{ final_filebeat_cert.certificate }}"
+      private_key: "{{ final_filebeat_cert.private_key }}"
+  when: >
+    existing_cert.data is not defined or
+    (cert_expiry.rc | default(1)) != 0
+  no_log: true
+
+- name: Lire le CA depuis Vault
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: secret
+    path: tmp/pki/ca.crt
+  delegate_to: localhost
+  register: ca_cert
+  no_log: true
+
+- name: Copy CA vers filebeat
+  ansible.builtin.copy:
+    dest: /etc/filebeat/certs/ca.crt
+    content: "{{ ca_cert.data.data.certificate }}"
+    owner: filebeat
+    group: filebeat
+    mode: "0644"
+  notify: restart filebeat
+
+- name: Wait for Elasticsearch
+  ansible.builtin.uri:
+    url: "https://{{ elasticsearch_host }}:9200/_cluster/health"
+    method: GET
+    user: elastic
+    password: "{{ elastic_secret.data.data.elastic_password }}"
+    validate_certs: true
+    ca_path: /etc/filebeat/certs/ca.crt
+  register: es_health
+  until: >
+    es_health.status == 200 and
+    es_health.json.status in ['yellow', 'green']
+  retries: 30
+  delay: 5
+
+- name: Create Filebeat keystore
+  ansible.builtin.command:
+    cmd: /usr/share/filebeat/bin/filebeat keystore create
+    creates: /etc/filebeat/filebeat.keystore
+
+- name: Get Filebeat API key from Vault
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: secret
+    path: filebeat_api_key
+  delegate_to: localhost
+  register: filebeat_api_key_secret
+  no_log: true
+
+- name: Add Filebeat API key to keystore
+  ansible.builtin.command:
+    cmd: >
+      /usr/share/filebeat/bin/filebeat keystore add
+      ES_API_KEY --stdin 
+    stdin: "{{ filebeat_api_key_secret.data.data.api_key }}"
+  register: keystore_apikey
+  changed_when: keystore_apikey.rc == 0 and 'already exists' not in keystore_apikey.stderr
+  failed_when: keystore_apikey.rc != 0 and 'already exists' not in keystore_apikey.stderr
+  no_log: true
+  notify: restart filebeat
+
+- name: Get kibana password from Vault
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: secret
+    path: kibana
+  delegate_to: localhost
+  register: kibana_secret
+  no_log: true
+
+- name: Add Kibana password to Filebeat keystore
+  ansible.builtin.command:
+    cmd: >
+      /usr/share/filebeat/bin/filebeat keystore add
+      KIBANA_PASSWORD --stdin
+    stdin: "{{ kibana_secret.data.data.kibana_password }}"
+  no_log: true
+  register: keystore_kibana
+  changed_when: keystore_kibana.rc == 0 and 'already exists' not in keystore_kibana.stderr
+  failed_when: keystore_kibana.rc != 0 and 'already exists' not in keystore_kibana.stderr
+  notify: restart filebeat
+   
+- name: Activer parsing logs 
+  ansible.builtin.template:
+    src: filebeat.yml.j2
+    dest: /etc/filebeat/filebeat.yml
+    validate: '/usr/bin/filebeat -t -c %s'
+  notify: restart filebeat

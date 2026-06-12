@@ -1,17 +1,55 @@
-- name: Get elastic secret from Vault
+- name: Verify elastic secret from Vault
   community.hashi_vault.vault_kv2_get:
     url: "{{ vault_url }}"
-    token: "{{ hostvars['localhost']['vault_token'] }}"
+    token: "{{ vault_token }}"
     engine_mount_point: secret
     path: elastic
   delegate_to: localhost
   register: elastic_secret
+  ignore_errors: true
+  no_log: true 
+
+- name: Generate elastic password
+  ansible.builtin.set_fact:
+    elastic_password: "{{ lookup('ansible.builtin.password', '/dev/null length=24 chars=ascii_letters,digits') }}"
+  when: elastic_secret is failed
+  run_once: true
+  no_log: true
+
+- name: Store elastic password
+  community.hashi_vault.vault_kv2_write:
+    url: "{{ vault_url }}"
+    token: "{{ vault_token }}"
+    engine_mount_point: secret
+    path: elastic
+    data:
+      elastic_password: "{{ elastic_password }}"
+  delegate_to: localhost
+  run_once: true
+  register: elastic_store_result
+  when: elastic_secret is failed
+  no_log: true
+
+- name: Assert elastic password was stored
+  ansible.builtin.assert:
+    that: not elastic_store_result.failed
+    fail_msg: "Échec écriture Vault — secret non persisté"
+  when:
+    - elastic_secret is failed
+    - elastic_store_result is defined
+
+- name: Propagate elastic password to all hosts
+  ansible.builtin.set_fact:
+    elastic_password: "{{ hostvars[ansible_play_hosts[0]].elastic_password }}"
+  when: 
+    - elastic_secret is failed
+    - elastic_password is not defined
   no_log: true
 
 - name: Get Filebeat API key from Vault
   community.hashi_vault.vault_kv2_get:
     url: "{{ vault_url }}"
-    token: "{{ hostvars['localhost']['vault_token'] }}"
+    token: "{{ vault_token }}"
     engine_mount_point: secret
     path: filebeat_api_key
   delegate_to: localhost
@@ -24,7 +62,12 @@
     url: "https://{{ elasticsearch_host }}:9200/_security/api_key"
     method: POST
     user: elastic
-    password: "{{ elastic_secret.data.data.elastic_password }}"
+    password: >-
+      {{
+        elastic_secret.data.data.elastic_password
+        if elastic_secret is not failed
+        else elastic_password | default('')
+      }}
     body_format: json
     body:
       name: filebeat-key
@@ -33,7 +76,6 @@
           cluster:
             - monitor
             - manage_ilm
-            - manage_own_api_key
           index:
             - names: 
                 - "filebeat-*"
@@ -51,7 +93,7 @@
 - name: Store Filebeat API key in Vault
   community.hashi_vault.vault_kv2_write:
     url: "{{ vault_url }}"
-    token: "{{ hostvars['localhost']['vault_token'] }}"
+    token: "{{ vault_token }}"
     engine_mount_point: secret
     path: filebeat_api_key
     data:
@@ -60,12 +102,14 @@
   when: filebeat_secret is failed
   no_log: true
 
-- name: Set Filebeat API key fact
+- name: Set Filebeat API key fact (from vault)
   ansible.builtin.set_fact:
-    filebeat_api_key: >-
-      {{
-        filebeat_secret.data.data.api_key
-        if filebeat_secret is not failed
-        else filebeat_api_key_result.json.id ~ ':' ~ filebeat_api_key_result.json.api_key
-      }}
+    filebeat_api_key: "{{ filebeat_secret.data.data.api_key }}"
+  when: filebeat_secret is not failed
+  no_log: true
+
+- name: Set Filebeat API key fact (newly created)
+  ansible.builtin.set_fact:
+    filebeat_api_key: "{{ filebeat_api_key_result.json.id }}:{{ filebeat_api_key_result.json.api_key }}"
+  when: filebeat_secret is failed
   no_log: true

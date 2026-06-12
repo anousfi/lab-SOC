@@ -1,22 +1,25 @@
-
 - name: Installer docker 
   ansible.builtin.apt: 
     name: docker.io 
     state: present 
+
 - name: demarrer docker 
   ansible.builtin.systemd: 
     name: docker 
     state: started 
     enabled: true 
+
 - name: Ajouter utilisateur au groupe docker
   ansible.builtin.user:
     name: "{{ ansible_user }}"
     groups: docker
     append: yes
+
 - name: Installer dépendances Docker Python
   ansible.builtin.apt:
     name: python3-docker
     state: present
+
 - name: deployer appli vulnerable 
   community.docker.docker_container: 
     name: webserver_vulnerable 

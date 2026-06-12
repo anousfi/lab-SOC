@@ -1,0 +1,18 @@
+- name: Installer filebeat
+  ansible.builtin.apt:
+    name: filebeat
+    state: present
+
+- name: Activer module Docker Filebeat si pas déjà fait
+  ansible.builtin.command: filebeat modules enable docker
+  become: yes
+  register: docker_module
+  changed_when: "'Enabled' in docker_module.stdout"
+
+- name: Create cert dir
+  ansible.builtin.file:
+    path: /etc/filebeat/certs
+    state: directory
+    owner: filebeat
+    group: filebeat
+    mode: "0700"

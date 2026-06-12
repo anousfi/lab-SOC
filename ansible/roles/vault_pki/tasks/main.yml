@@ -92,6 +92,12 @@
         - kibana
         - filebeat
         - localhost
+      allow_ip_sans: true
       allow_subdomains: true
       allow_bare_domains: true
-      allow_ip_sans: true
+      allowed_uri_sans:
+         - spiffe://lab.local/*
+      server_flag: true
+      client_flag: true
+      key_type: ec
+      key_bits: 256

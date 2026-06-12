@@ -9,6 +9,7 @@
     engine_mount_point: secret
     path: elastic
   register: elastic_secret
+  delegate_to: localhost
   ignore_errors: true
   no_log: true
 
@@ -28,8 +29,8 @@
     url: "https://{{ elasticsearch_host }}:9200"
     validate_certs: true
     ca_path: /etc/elasticsearch/certs/ca.crt
-  register: es_health
-  until: es_health.status == 200
+  register: es_up
+  until: es_up.status in [200, 401]
   retries: 10
   delay: 10
 
@@ -55,18 +56,30 @@
   register: reset_result
   changed_when: reset_result.rc == 0
   no_log: true
-  when: auth_check is failed
+  when: auth_check.status  | default(0) == 401
+
+- name: Extraire le mot de passe bootstrap
+  ansible.builtin.set_fact:
+    bootstrap_password: "{{ reset_result.stdout | regex_search('New value: (.+)', '\\1') | first }}"
+  when: auth_check.status | default(0) == 401
+  no_log: true
+
+- name: Assert bootstrap password extracted
+  ansible.builtin.assert:
+    that: bootstrap_password | length > 0
+    fail_msg: "Impossible d'extraire le mot de passe bootstrap"
+  when: auth_check.status | default(0) == 401
 
 - name: Set elastic password via API
   ansible.builtin.uri:
     url: "https://{{ elasticsearch_host }}:9200/_security/user/elastic/_password"
     method: POST
     user: elastic
-    password: "{{ reset_result.stdout | default('') | regex_search('New value: (.+)', '\\1') | first | default('') }}"
+    password: "{{ bootstrap_password }}"
     body_format: json
     body:
       password: "{{ elastic_secret.data.data.elastic_password }}"
     validate_certs: true
     ca_path: /etc/elasticsearch/certs/ca.crt
   no_log: true
-  when: auth_check is failed
+  when: auth_check.status | default(0) == 401

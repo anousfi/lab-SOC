@@ -3,13 +3,11 @@
   roles:
     - vault_auth
     - vault_pki
-    - vault_certs
-    - vault_credentials
 
-- hosts: role_elasticsearch
+- hosts: role_elasticSearch
   become: true
   roles:
-    - elasticSearch
+    - elasticsearch
 
 - hosts: role_kibana
   become: true
