@@ -14,7 +14,7 @@
     data:
       type: pki
       description: "PKI du lab"
-  when: pki_path + '/' not in existing_mounts.data
+  when: pki_path + '/' not in existing_mounts.data.keys()
 
 - name: Configurer le TTL du mount PKI
   community.hashi_vault.vault_write:
