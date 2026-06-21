@@ -4,6 +4,7 @@
     auth_method: approle
     role_id: "{{ vault_role_id }}"
     secret_id: "{{ vault_secret_id }}"
+  delegate_to: localhost
   register: vault_login
   no_log: true
   failed_when: vault_login.login is not defined

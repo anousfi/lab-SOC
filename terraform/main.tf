@@ -58,6 +58,10 @@ resource "aws_instance" "webserver" {
   user_data = <<-EOF
               #!/bin/bash
               apt update -y
+              apt install -y python3-pip python3-venv pipx
+
+              # hvac uniquement — pas besoin d'ansible/boto3 sur les nodes
+              PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install hvac
               EOF
 
 
@@ -84,6 +88,10 @@ resource "aws_instance" "elasticsearch" {
   user_data = <<-EOF
               #!/bin/bash
               apt update -y
+              apt install -y python3-pip python3-venv pipx
+
+              # hvac uniquement — pas besoin d'ansible/boto3 sur les nodes
+              PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install hvac
               EOF
 
 
@@ -109,6 +117,10 @@ resource "aws_instance" "kibana" {
   user_data = <<-EOF
               #!/bin/bash
               apt update -y
+              apt install -y python3-pip python3-venv pipx
+
+              # hvac uniquement — pas besoin d'ansible/boto3 sur les nodes
+              PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install hvac
               EOF
 
 
@@ -286,14 +298,14 @@ resource "aws_security_group" "administration_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["public address"]
+    cidr_blocks = ["my public address"]
   }
 
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["public address"]
+    cidr_blocks = ["my public address"]
   }
 
   egress {
@@ -315,7 +327,7 @@ resource "aws_security_group" "webserver_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["public address"]
+    cidr_blocks = ["my public address"]
   }
 
   egress {
