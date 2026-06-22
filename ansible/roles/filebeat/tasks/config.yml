@@ -94,6 +94,7 @@
     data:
       certificate: "{{ final_filebeat_cert.certificate }}"
       private_key: "{{ final_filebeat_cert.private_key }}"
+  delegate_to: localhost
   when: >
     existing_cert.data is not defined or
     (cert_expiry.rc | default(1)) != 0

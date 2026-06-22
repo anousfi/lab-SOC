@@ -77,6 +77,7 @@
     data:
       certificate: "{{ elastic_cert.data.data.certificate }}"
       private_key: "{{ elastic_cert.data.data.private_key }}"
+  delegate_to: localhost
   when: elastic_cert is changed
   no_log: true
 

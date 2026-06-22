@@ -3,7 +3,7 @@ ansible_aws_ssm_region: eu-west-3
 ansible_aws_ssm_bucket_name: aws-s3-soc-lab-253490786526-eu-west-3-an
 ansible_shell_type: sh
 ansible_shell_executable: /bin/sh
-ansible_python_interpreter: /opt/ansible-venv/bin/python3
+ansible_python_interpreter: /opt/ansible-venv/bin/python
 elasticsearch_host: 10.0.x.x
 elasticsearch_port: 9200
 kibana_port: 5601
