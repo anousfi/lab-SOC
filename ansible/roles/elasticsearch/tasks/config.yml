@@ -10,8 +10,7 @@
   community.hashi_vault.vault_read:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    engine_mount_point: secret
-    path: tmp/certs/elastic/elastic.crt
+    path: secret/data/certs/elastic/elastic.crt
   delegate_to: localhost
   register: existing_cert
   failed_when: false
@@ -39,7 +38,7 @@
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
     engine_mount_point: pki
-    role_name: "{{ elastic_role_name }}"
+    role_name: "{{ pki_role_name }}"
     common_name: elasticSearch.lab.local
     alt_names: elasticSearch.lab.local,elasticSearch
   when: >
@@ -73,7 +72,7 @@
   community.hashi_vault.vault_write:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    path: tmp/certs/elastic/elasticsearch.crt
+    path: secret/data/certs/elastic/elasticsearch.crt
     data:
       certificate: "{{ elastic_cert.data.data.certificate }}"
       private_key: "{{ elastic_cert.data.data.private_key }}"

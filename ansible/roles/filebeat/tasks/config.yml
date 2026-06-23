@@ -12,8 +12,7 @@
   community.hashi_vault.vault_kv2_get:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    engine_mount_point: secret
-    path: tmp/certs/filebeat/filebeat.crt
+    path: secret/data/certs/filebeat/filebeat.crt
   delegate_to: localhost
   register: existing_cert
   ignore_errors: true
@@ -42,7 +41,7 @@
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
     engine_mount_point: pki
-    role_name: "{{ filebeat_role_name }}"
+    role_name: "{{ pki_role_name }}"
     common_name: filebeat.lab.local
     alt_names: filebeat.lab.local,filebeat
   when: >
@@ -89,8 +88,7 @@
   community.hashi_vault.vault_kv2_write:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    engine_mount_point: secret
-    path: tmp/certs/filebeat/filebeat.crt
+    path: secret/data/certs/filebeat/filebeat.crt
     data:
       certificate: "{{ final_filebeat_cert.certificate }}"
       private_key: "{{ final_filebeat_cert.private_key }}"

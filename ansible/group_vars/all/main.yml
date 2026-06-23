@@ -8,6 +8,7 @@ elasticsearch_host: 10.0.x.x
 elasticsearch_port: 9200
 kibana_port: 5601
 vault_url: "http://vault.lab.local:8200"
+pki_role_name: "mon-role-pki"
 filebeat_role_name: filebeat
 kibana_role_name: kibana
-elastic_role_name: elastic
+elastic_role_name: elasticsearch

@@ -12,8 +12,7 @@
   community.hashi_vault.vault_kv2_get:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    engine_mount_point: secret
-    path: tmp/certs/kibana/kibana.crt
+    path: secret/data/certs/kibana/kibana.crt
   delegate_to: localhost
   register: existing_cert
   ignore_errors: true
@@ -42,7 +41,7 @@
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
     engine_mount_point: pki
-    role_name: "{{ kibana_role_name }}"
+    role_name: "{{ pki_role_name }}"
     common_name: kibana.lab.local
     alt_names: kibana.lab.local,kibana
   when: >
@@ -89,8 +88,7 @@
   community.hashi_vault.vault_kv2_write:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    engine_mount_point: secret
-    path: tmp/certs/kibana/kibana.crt
+    path: secret/data/certs/kibana/kibana.crt
     data:
       certificate: "{{ final_kibana_cert.certificate }}"
       private_key: "{{ final_kibana_cert.private_key }}"
