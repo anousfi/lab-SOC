@@ -72,7 +72,8 @@
   community.hashi_vault.vault_write:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    path: secret/data/certs/elastic/elasticsearch.crt
+    engine_mount_point: secret
+    path: certs/elastic/elasticsearch.crt
     data:
       certificate: "{{ elastic_cert.data.data.certificate }}"
       private_key: "{{ elastic_cert.data.data.private_key }}"
@@ -84,8 +85,7 @@
   community.hashi_vault.vault_read:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    engine_mount_point: secret
-    path: tmp/pki/ca.crt
+    path: pki/cert/ca.crt
   delegate_to: localhost
   register: ca_cert
 

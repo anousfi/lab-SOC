@@ -21,7 +21,8 @@
 - name: Démarrer Elasticsearch
   ansible.builtin.systemd:
     name: elasticsearch
-    state: "{{ 'restarted' if ansible_facts.services['elasticsearch.service'].state | default('') == 'running' else 'started' }}"
+    #state: "{{ 'restarted' if ansible_facts.services['elasticsearch.service'].state | default('') == 'running' else 'started' }}"
+    state: restarted
     enabled: true
 
 - name: Attendre qu'Elasticsearch soit prêt
