@@ -44,6 +44,7 @@
     role_name: "{{ pki_role_name }}"
     common_name: kibana.lab.local
     alt_names: kibana.lab.local,kibana
+    ip_sans: "{{ hostvars[groups['role_kibana'][0]].ansible_facts['default_ipv4']['address'] }},127.0.0.1"
   when: >
     existing_cert.data is not defined or
     (cert_expiry.rc | default(1)) != 0
@@ -51,17 +52,20 @@
   register: kibana_cert
   no_log: true
 
-- name: Résoudre le cert final
+- name: Résoudre le cert final (nouveau cert généré)
   ansible.builtin.set_fact:
     final_kibana_cert:
-      certificate: >-
-        {{ kibana_cert.data.certificate
-           if kibana_cert is not skipped
-           else existing_cert.data.data.certificate }}
-      private_key: >-
-        {{ kibana_cert.data.private_key
-           if kibana_cert is not skipped
-           else existing_cert.data.data.private_key }}
+      certificate: "{{ kibana_cert.data.data.certificate }}"
+      private_key: "{{ kibana_cert.data.data.private_key }}"
+  when: kibana_cert is not skipped
+  no_log: true
+
+- name: Résoudre le cert final (cert existant depuis Vault)
+  ansible.builtin.set_fact:
+    final_kibana_cert:
+      certificate: "{{ existing_cert.data.data.certificate }}"
+      private_key: "{{ existing_cert.data.data.private_key }}"
+  when: kibana_cert is skipped
   no_log: true
 
 - name: copy kibana cert
@@ -94,16 +98,14 @@
       certificate: "{{ final_kibana_cert.certificate }}"
       private_key: "{{ final_kibana_cert.private_key }}"
   delegate_to: localhost
-  when: >
-    existing_cert.data is not defined or
-    (cert_expiry.rc | default(1)) != 0
+  when: kibana_cert is not skipped
   no_log: true
 
 - name: Lire le CA depuis Vault
   community.hashi_vault.vault_kv2_get:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    path: pki/cert/ca.crt
+    path: pki/cert/ca
   delegate_to: localhost
   register: ca_cert
 

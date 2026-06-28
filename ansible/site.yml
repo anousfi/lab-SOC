@@ -3,6 +3,7 @@
   roles:
     - vault_auth
     - vault_pki
+    - vault_credentials
 
 - hosts: role_elasticSearch
   become: true

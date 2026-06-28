@@ -18,6 +18,17 @@
     msg: "Elastic password missing in Vault"
   when: elastic_secret is failed
 
+- name: Créer et corriger les permissions des répertoires Elasticsearch
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: elasticsearch
+    group: elasticsearch
+    mode: '0750'
+  loop:
+    - /usr/share/elasticsearch/logs
+    - /usr/share/elasticsearch/data
+
 - name: Démarrer Elasticsearch
   ansible.builtin.systemd:
     name: elasticsearch
@@ -35,17 +46,16 @@
   retries: 10
   delay: 10
 
-- name: Vérifier si les credentials Vault sont déjà valides
-  ansible.builtin.uri:
-    url: "https://{{ elasticsearch_host }}:9200"
-    method: GET
-    user: elastic
-    password: "{{ elastic_secret.data.data.elastic_password }}"
-    validate_certs: true
-    ca_path: /etc/elasticsearch/certs/ca.crt
-  register: auth_check
-  ignore_errors: true
-  no_log: true
+- name: Attendre qu'Elasticsearch soit prêt
+  ansible.builtin.command:
+    cmd: >
+      curl -sk -o /dev/null -w "%{http_code}"
+      --cacert /etc/elasticsearch/certs/ca.crt
+      https://127.0.0.1:9200
+  register: es_up
+  until: es_up.stdout in ['200', '401']
+  retries: 10
+  delay: 10
 
 - name: Initialiser le mot de passe elastic (bootstrap)
   ansible.builtin.command:

@@ -40,6 +40,7 @@
     engine_mount_point: pki
     role_name: "{{ pki_role_name }}"
     common_name: elasticSearch.lab.local
+    ip_sans: "{{ hostvars[groups['role_elasticSearch'][0]].ansible_facts['default_ipv4']['address'] }},127.0.0.1"
     alt_names: elasticSearch.lab.local,elasticSearch
   when: >
     existing_cert.data is not defined or
@@ -69,7 +70,7 @@
   notify: restart elasticsearch
 
 - name: Store generated cert in Vault
-  community.hashi_vault.vault_write:
+  community.hashi_vault.vault_kv2_write:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
     engine_mount_point: secret
@@ -78,14 +79,14 @@
       certificate: "{{ elastic_cert.data.data.certificate }}"
       private_key: "{{ elastic_cert.data.data.private_key }}"
   delegate_to: localhost
-  when: elastic_cert is changed
+  when: elastic_cert is not skipped
   no_log: true
 
 - name: Lire le CA depuis Vault
   community.hashi_vault.vault_read:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    path: pki/cert/ca.crt
+    path: pki/cert/ca
   delegate_to: localhost
   register: ca_cert
 

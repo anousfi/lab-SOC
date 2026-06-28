@@ -51,17 +51,20 @@
   register: filebeat_cert
   no_log: true
 
-- name: Résoudre le cert final
+- name: Résoudre le cert final (nouveau cert généré)
   ansible.builtin.set_fact:
-    final_filebeat_cert:
-      certificate: >-
-        {{ filebeat_cert.data.certificate
-           if filebeat_cert is not skipped
-           else existing_cert.data.data.certificate }}
-      private_key: >-
-        {{ filebeat_cert.data.private_key
-           if filebeat_cert is not skipped
-           else existing_cert.data.data.private_key }}
+    final_kibana_cert:
+      certificate: "{{ filebeat_cert.data.data.certificate }}"
+      private_key: "{{ filebeat_cert.data.data.private_key }}"
+  when: filebeat_cert is not skipped
+  no_log: true
+
+- name: Résoudre le cert final (cert existant depuis Vault)
+  ansible.builtin.set_fact:
+    final_kibana_cert:
+      certificate: "{{ existing_cert.data.data.certificate }}"
+      private_key: "{{ existing_cert.data.data.private_key }}"
+  when: filebeat_cert is skipped
   no_log: true
 
 - name: copy filebeat cert
@@ -94,16 +97,14 @@
       certificate: "{{ final_filebeat_cert.certificate }}"
       private_key: "{{ final_filebeat_cert.private_key }}"
   delegate_to: localhost
-  when: >
-    existing_cert.data is not defined or
-    (cert_expiry.rc | default(1)) != 0
+  when: existing_cert is not skipped
   no_log: true
 
 - name: Lire le CA depuis Vault
   community.hashi_vault.vault_kv2_get:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
-    path: pki/cert/ca.crt
+    path: pki/cert/ca
   delegate_to: localhost
   register: ca_cert
   no_log: true
