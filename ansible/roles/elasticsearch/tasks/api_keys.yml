@@ -46,6 +46,12 @@
     - elastic_password is not defined
   no_log: true
 
+- name: Set elastic password fact (from Vault)
+  ansible.builtin.set_fact:
+    elastic_password: "{{ elastic_secret.data.data.elastic_password }}"
+  when: elastic_secret is not failed
+  no_log: true
+
 - name: Get Filebeat API key from Vault
   community.hashi_vault.vault_kv2_get:
     url: "{{ vault_url }}"
@@ -62,12 +68,7 @@
     url: "https://{{ elasticsearch_host }}:9200/_security/api_key"
     method: POST
     user: elastic
-    password: >-
-      {{
-        elastic_secret.data.data.elastic_password
-        if elastic_secret is not failed
-        else elastic_password | default('')
-      }}
+    password: "{{ elastic_password }}"
     body_format: json
     body:
       name: filebeat-key
@@ -88,6 +89,7 @@
     ca_path: /etc/elasticsearch/certs/ca.crt
   register: filebeat_api_key_result
   when: filebeat_secret is failed
+  run_one: true
   no_log: true
 
 - name: Store Filebeat API key in Vault
@@ -100,6 +102,7 @@
       api_key: "{{ filebeat_api_key_result.json.id }}:{{ filebeat_api_key_result.json.api_key }}"
   delegate_to: localhost
   when: filebeat_secret is failed
+  run_once: true
   no_log: true
 
 - name: Set Filebeat API key fact (from vault)

@@ -1,7 +1,12 @@
 filebeat.inputs:
-  - type: container
+  - type: filestream
+    id: docker-logs
     paths:
       - /var/lib/docker/containers/*/*.log
+    parsers:
+      - container:
+          stream: all
+          format: docker
 
 output.elasticsearch:
   hosts: ["https://{{ elasticsearch_host }}:{{ elasticsearch_port }}"]

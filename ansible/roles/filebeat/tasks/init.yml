@@ -3,11 +3,11 @@
     name: filebeat
     state: present
 
-- name: Activer module Docker Filebeat si pas déjà fait
-  ansible.builtin.command: filebeat modules enable docker
-  become: yes
-  register: docker_module
-  changed_when: "'Enabled' in docker_module.stdout"
+#- name: Activer module Docker Filebeat si pas déjà fait
+#  ansible.builtin.command: filebeat modules enable docker
+#  become: yes
+#  register: docker_module
+#  changed_when: "'Enabled' in docker_module.stdout"
 
 - name: Create cert dir
   ansible.builtin.file:

@@ -12,3 +12,4 @@ pki_role_name: "mon-role-pki"
 filebeat_role_name: filebeat
 kibana_role_name: kibana
 elastic_role_name: elasticsearch
+docker_user: ubuntu

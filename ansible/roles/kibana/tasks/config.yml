@@ -43,7 +43,7 @@
     engine_mount_point: pki
     role_name: "{{ pki_role_name }}"
     common_name: kibana.lab.local
-    alt_names: kibana.lab.local,kibana
+    alt_names: kibana.lab.local,kibana,localhost
     ip_sans: "{{ hostvars[groups['role_kibana'][0]].ansible_facts['default_ipv4']['address'] }},127.0.0.1"
   when: >
     existing_cert.data is not defined or
@@ -102,7 +102,7 @@
   no_log: true
 
 - name: Lire le CA depuis Vault
-  community.hashi_vault.vault_kv2_get:
+  community.hashi_vault.vault_read:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
     path: pki/cert/ca
@@ -151,34 +151,31 @@
 
 - name: Vérifier si le mot de passe kibana_system est déjà correct
   ansible.builtin.uri:
-    url: "https://{{ elasticsearch_host }}:9200/_security/user/kibana_system"
+    url: "https://{{ elasticsearch_host }}:9200/_cluster/health"
     method: GET
     user: kibana_system
     password: "{{ kibana_secret.data.data.kibana_password }}"
     validate_certs: true
     ca_path: /etc/kibana/certs/ca.crt
+    status_code: [ 200, 401]
   register: kibana_auth_check
-  ignore_errors: true
   no_log: true
 
 - name: Set kibana_system password
   ansible.builtin.uri:
     url: "https://{{ elasticsearch_host }}:9200/_security/user/kibana_system/_password"
     method: POST
-
     user: elastic
     password: "{{ elastic_secret.data.data.elastic_password }}"
     force_basic_auth: true
-
     body_format: json
     body:
       password: "{{ kibana_secret.data.data.kibana_password }}"
-
     validate_certs: true
     ca_path: /etc/kibana/certs/ca.crt
     status_code: 200
   no_log: true
-  when: kibana_auth_check is failed
+  when: kibana_auth_check.status == 401
 
 - name: Add kibana_system password to keystore
   ansible.builtin.command:

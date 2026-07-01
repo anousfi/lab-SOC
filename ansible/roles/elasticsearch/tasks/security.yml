@@ -1,8 +1,4 @@
-# security.yml
-- name: Collecter l'état des services
-  ansible.builtin.service_facts:
-
-- name: Get secrets from Vault
+- name: Get elastic secret from Vault
   community.hashi_vault.vault_kv2_get:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
@@ -10,41 +6,7 @@
     path: elastic
   register: elastic_secret
   delegate_to: localhost
-  ignore_errors: true
   no_log: true
-
-- name: Fail if secret missing
-  ansible.builtin.fail:
-    msg: "Elastic password missing in Vault"
-  when: elastic_secret is failed
-
-- name: Créer et corriger les permissions des répertoires Elasticsearch
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: directory
-    owner: elasticsearch
-    group: elasticsearch
-    mode: '0750'
-  loop:
-    - /usr/share/elasticsearch/logs
-    - /usr/share/elasticsearch/data
-
-- name: Démarrer Elasticsearch
-  ansible.builtin.systemd:
-    name: elasticsearch
-    #state: "{{ 'restarted' if ansible_facts.services['elasticsearch.service'].state | default('') == 'running' else 'started' }}"
-    state: restarted
-    enabled: true
-
-- name: Attendre qu'Elasticsearch soit prêt
-  ansible.builtin.uri:
-    url: "https://{{ elasticsearch_host }}:9200"
-    validate_certs: true
-    ca_path: /etc/elasticsearch/certs/ca.crt
-  register: es_up
-  until: es_up.status in [200, 401]
-  retries: 10
-  delay: 10
 
 - name: Attendre qu'Elasticsearch soit prêt
   ansible.builtin.command:
@@ -56,32 +18,43 @@
   until: es_up.stdout in ['200', '401']
   retries: 10
   delay: 10
+  changed_when: false
 
-- name: Initialiser le mot de passe elastic (bootstrap)
+- name: Vérifier si Elastic est déjà configuré avec le mot de passe Vault
+  ansible.builtin.uri:
+    url: "https://{{ elasticsearch_host }}:9200/_cluster/health"
+    method: GET
+    user: elastic
+    password: "{{ elastic_secret.data.data.elastic_password }}"
+    validate_certs: true
+    ca_path: /etc/elasticsearch/certs/ca.crt
+    status_code: [200, 401]
+  register: auth_check
+  no_log: true
+
+- name: Bootstrap — reset password temporaire
   ansible.builtin.command:
     cmd: >
       /usr/share/elasticsearch/bin/elasticsearch-reset-password
       -u elastic --batch --url https://{{ elasticsearch_host }}:9200
-  environment:
-    ES_JAVA_OPTS: ""
   register: reset_result
   changed_when: reset_result.rc == 0
   no_log: true
-  when: auth_check.status  | default(0) == 401
+  when: auth_check.status == 401
 
-- name: Extraire le mot de passe bootstrap
+- name: Bootstrap — extraire le mot de passe temporaire
   ansible.builtin.set_fact:
     bootstrap_password: "{{ reset_result.stdout | regex_search('New value: (.+)', '\\1') | first }}"
-  when: auth_check.status | default(0) == 401
   no_log: true
+  when: auth_check.status == 401
 
-- name: Assert bootstrap password extracted
+- name: Bootstrap — assert mot de passe extrait
   ansible.builtin.assert:
     that: bootstrap_password | length > 0
     fail_msg: "Impossible d'extraire le mot de passe bootstrap"
-  when: auth_check.status | default(0) == 401
+  when: auth_check.status == 401
 
-- name: Set elastic password via API
+- name: Bootstrap — appliquer le mot de passe Vault
   ansible.builtin.uri:
     url: "https://{{ elasticsearch_host }}:9200/_security/user/elastic/_password"
     method: POST
@@ -92,5 +65,17 @@
       password: "{{ elastic_secret.data.data.elastic_password }}"
     validate_certs: true
     ca_path: /etc/elasticsearch/certs/ca.crt
+    status_code: 200
   no_log: true
-  when: auth_check.status | default(0) == 401
+  when: auth_check.status == 401
+
+- name: Vérifier l'auth finale avec le mot de passe Vault
+  ansible.builtin.uri:
+    url: "https://{{ elasticsearch_host }}:9200/_cluster/health"
+    method: GET
+    user: elastic
+    password: "{{ elastic_secret.data.data.elastic_password }}"
+    validate_certs: true
+    ca_path: /etc/elasticsearch/certs/ca.crt
+    status_code: 200
+  no_log: true

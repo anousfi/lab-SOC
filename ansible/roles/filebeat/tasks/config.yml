@@ -43,7 +43,7 @@
     engine_mount_point: pki
     role_name: "{{ pki_role_name }}"
     common_name: filebeat.lab.local
-    alt_names: filebeat.lab.local,filebeat
+    alt_names: filebeat.lab.local,filebeat,localhost
   when: >
     existing_cert.data is not defined or
     (cert_expiry.rc | default(1)) != 0
@@ -101,7 +101,7 @@
   no_log: true
 
 - name: Lire le CA depuis Vault
-  community.hashi_vault.vault_kv2_get:
+  community.hashi_vault.vault_read:
     url: "{{ vault_url }}"
     token: "{{ vault_token }}"
     path: pki/cert/ca

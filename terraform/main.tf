@@ -247,7 +247,7 @@ resource "aws_security_group" "elastic_sg"{
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
+    security_groups = [aws_security_group.administration_sg.id]
   }
 
   egress {
@@ -286,7 +286,7 @@ resource "aws_security_group" "kibana_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
+    security_groups = [aws_security_group.administration_sg.id]
   }
 
   egress {
@@ -309,14 +309,14 @@ resource "aws_security_group" "administration_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["adresse publique"]
+    cidr_blocks = ["public address"]
   }
 
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["adresse publique"]
+    cidr_blocks = ["public address"]
   }
 
   egress {
@@ -338,7 +338,7 @@ resource "aws_security_group" "webserver_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["adresse publique"]
+    cidr_blocks = ["public address"]
   }
 
   egress {

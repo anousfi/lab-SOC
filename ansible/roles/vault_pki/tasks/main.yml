@@ -32,6 +32,7 @@
     path: "{{ pki_path }}/cert/ca"
   register: existing_ca
   ignore_errors: true
+  no_log: true
 
 # 3. Générer la CA racine
 - name: Générer CA racine
@@ -44,6 +45,7 @@
       ttl: "{{ pki_ttl }}"
   register: root_ca
   when: existing_ca is failed
+  no_log: true
 
 # 3b. Récupérer le certificat CA existant (si déjà présente)
 - name: Récupérer CA existante
